@@ -1,7 +1,7 @@
-
 {
   "name": "nerolympics",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "private": true,
   "description": "Nerolympics event website and staff management system",
   "main": "server.js",
   "scripts": {
