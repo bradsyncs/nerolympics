@@ -1,874 +1,212 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#090a10">
-<title>Nerolympics | Staff Control</title>
+<meta name="theme-color" content="#080711">
+<title>Nerolympics | Staff Control Center</title>
 <style>
-:root{--bg:#090a10;--panel:#131621;--panel2:#191e2b;--line:#2a3040;--text:#f4f5fa;--muted:#9ba2b5;--accent:#a78bfa;--cyan:#77d9ed;--red:#ff7272}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif}
-button,input,select,textarea{font:inherit}
-button{background:linear-gradient(110deg,#a78bfa,#77d9ed);color:#090a10;border:0;border-radius:9px;padding:11px 15px;font-weight:800;cursor:pointer}
-button.secondary{background:#272c3b;color:white}
-button.danger{background:#512a34;color:#ffdce0}
-button:disabled{opacity:.5;cursor:not-allowed}
-input,select,textarea{width:100%;background:#0c0f17;color:white;border:1px solid var(--line);border-radius:9px;padding:11px;outline:none}
-textarea{min-height:85px;resize:vertical}
-label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
-.login{max-width:410px;margin:12vh auto;padding:28px;background:var(--panel);border:1px solid var(--line);border-radius:18px}
-.login h1{margin-top:0}
-.login p,.muted{color:var(--muted);font-size:13px;line-height:1.6}
-.hidden{display:none!important}
-.layout{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-aside{background:#0d1018;border-right:1px solid var(--line);padding:20px;position:sticky;top:0;height:100vh;overflow:auto}
-.logo{font-weight:900;letter-spacing:2px;margin:5px 0 25px}
-.logo span{color:var(--accent)}
-.navbtn{width:100%;display:block;text-align:left;background:transparent;color:var(--muted);padding:11px;border-radius:8px;margin:3px 0;font-weight:600}
-.navbtn.active,.navbtn:hover{background:var(--panel2);color:white}
-main{padding:28px;min-width:0;max-width:1400px;width:100%}
-.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}
-h1{font-size:26px;margin:0}
-h2{font-size:19px;margin:0 0 15px}
-h3{font-size:15px;margin:0 0 8px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:17px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px}
-.stat strong{font-size:27px;display:block;margin-top:8px}
-.stat span{color:var(--muted);font-size:12px}
-.gridform{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
-.tablewrap{overflow:auto}
-table{width:100%;border-collapse:collapse;min-width:550px}
-th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);font-size:12px}
-th{color:var(--muted);font-size:10px;letter-spacing:1px}
-td button{padding:7px 9px;font-size:11px}
-.item{padding:13px;border:1px solid var(--line);border-radius:10px;margin:8px 0;background:#10131d}
-.item strong{display:block;margin-bottom:5px}
-.item small{color:var(--muted)}
-.notice{padding:12px;border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:12px}
-#toast{position:fixed;bottom:20px;right:20px;background:#202638;border:1px solid var(--line);border-radius:10px;padding:13px 17px;display:none;z-index:20;max-width:90vw}
-@media(max-width:760px){.layout{display:block}aside{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}.navlist{display:flex;overflow-x:auto;gap:5px}.navbtn{white-space:nowrap;width:auto}.logo{margin-bottom:12px}main{padding:18px}.top{align-items:flex-start}}
+:root{color-scheme:dark;--bg:#080711;--panel:#171020;--panel2:#211632;--line:#49336d;--purple:#8b5cf6;--light:#a78bfa;--text:#f5f1ff;--muted:#b5a9c9;--red:#f87171;--green:#6ee7b7}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#291747,#080711 60%);color:var(--text);font:15px/1.5 system-ui,Arial,sans-serif}button,input,select,textarea{font:inherit}button{background:#302044;border:1px solid #65458c;color:white;padding:9px 13px;border-radius:9px;cursor:pointer;font-weight:650}button:hover{filter:brightness(1.2)}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--purple);border-color:var(--light)}.danger{background:#542631;border-color:#9d4557}.secondary{background:#211632}.small{font-size:12px;padding:6px 9px}input,select,textarea{width:100%;background:#100c18;border:1px solid var(--line);border-radius:9px;color:white;padding:10px;margin:4px 0 10px}textarea{min-height:85px;resize:vertical}label{display:block;color:var(--muted);font-size:12px;margin-top:8px}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:20px}.loginbox{width:min(100%,420px);padding:28px;background:var(--panel);border:1px solid var(--line);border-radius:18px}.loginbox h1{margin:0;font-size:26px}.muted,small{color:var(--muted)}.layout{display:grid;grid-template-columns:235px 1fr;min-height:100vh}.sidebar{background:#100c18;border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto}.brand{font-weight:900;letter-spacing:2px;padding:5px 10px 20px}.brand small{display:block;font-size:10px;letter-spacing:3px}.nav{display:grid;gap:5px}.nav button{text-align:left;background:transparent;border-color:transparent;color:#c9bddb}.nav button.active{background:#302044;border-color:#7654b8;color:white}.sidebarfoot{margin-top:20px;padding:8px}.main{padding:25px;max-width:1500px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}.top h1{margin:0;font-size:27px}.role{border:1px solid var(--line);border-radius:30px;padding:5px 10px;color:var(--light);font-size:12px}.page{display:none}.page.active{display:block}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.card,.panel{background:linear-gradient(145deg,#211632,#100d1b);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}.stat strong{display:block;font-size:28px}.stat span{font-size:11px;color:var(--muted);letter-spacing:1px}.toolbar,.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.row>*{flex:1}.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px;margin:12px 0}table{border-collapse:collapse;width:100%;min-width:650px}th,td{text-align:left;padding:10px;border-bottom:1px solid #302440;font-size:13px}th{color:var(--muted);background:#1b1328;font-size:11px}tr:last-child td{border:0}.pill{display:inline-block;border:1px solid var(--line);border-radius:30px;padding:3px 8px;font-size:11px}.notice{padding:12px;border:1px solid var(--line);border-radius:10px;background:#1b1328;margin:10px 0}.item{padding:12px 0;border-bottom:1px solid #302440}.item:last-child{border:0}.itemhead{display:flex;justify-content:space-between;gap:10px;align-items:center}.checkbox{width:auto}.permission{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #302440;padding:9px 0;gap:10px}.permission input{width:auto}.toast{position:fixed;bottom:18px;right:18px;background:var(--purple);padding:12px 16px;border-radius:10px;display:none;z-index:90}.modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:18px;z-index:80}.modalbox{width:min(100%,620px);max-height:85vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}.modalbox pre{white-space:pre-wrap;overflow-wrap:anywhere}.empty{text-align:center;padding:18px;color:var(--muted)}@media(max-width:850px){.layout{grid-template-columns:1fr}.sidebar{height:auto;position:relative;border-right:0;border-bottom:1px solid var(--line);padding:10px}.brand{padding:5px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.sidebarfoot{position:absolute;right:10px;top:5px}.main{padding:14px}.top{align-items:flex-start;flex-wrap:wrap}}
 </style>
 </head>
 <body>
-
 <section class="login" id="loginScreen">
-  <div class="logo">NERO<span>LYMPICS</span></div>
-  <h1>Staff Control</h1>
-  <p>Sign in to manage the Nerolympics event.</p>
-  <form id="loginForm">
-    <label>Username</label>
-    <input id="loginUsername" autocomplete="username" required>
-    <label>Password</label>
-    <input id="loginPassword" type="password" autocomplete="current-password" required>
-    <div class="actions"><button type="submit" style="width:100%">Sign In</button></div>
-  </form>
+<form class="loginbox" id="loginForm">
+<h1>NEROLYMPICS</h1><p class="muted">Staff Control Center</p>
+<label>Username</label><input id="loginUsername" autocomplete="username" required>
+<label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required>
+<button class="primary" type="submit">Sign In</button>
+<p id="loginError" class="muted"></p>
+</form>
 </section>
-
 <div class="layout hidden" id="dashboard">
-  <aside>
-    <div class="logo">NERO<span>LYMPICS</span></div>
-    <div class="muted" id="roleLabel">Staff dashboard</div>
-    <div class="navlist" id="navlist">
-      <button class="navbtn active" data-page="overview">Overview</button>
-      <button class="navbtn" data-page="players">Player Database</button>
-      <button class="navbtn" data-page="teams">Team Management</button>
-      <button class="navbtn" data-page="checkin">Check-in</button>
-      <button class="navbtn" data-page="events">Events</button>
-      <button class="navbtn" data-page="matches">Matches</button>
-      <button class="navbtn" data-page="points">Points & Achievements</button>
-      <button class="navbtn" data-page="challenges">Bonus Challenges</button>
-      <button class="navbtn" data-page="mvp">MVP Voting</button>
-      <button class="navbtn" data-page="announcements">Announcements</button>
-      <button class="navbtn" data-page="winner">Winner Announcement</button>
-      <button class="navbtn" data-page="prizes">Prize Distribution</button>
-      <button class="navbtn" data-page="backups">Backups & Export</button>
-    </div>
-    <button class="navbtn" id="logoutButton" style="margin-top:20px">Sign Out</button>
-  </aside>
-
-  <main>
-    <div class="top">
-      <div><h1 id="pageTitle">Overview</h1><div class="muted" id="lastUpdated">Event management system</div></div>
-      <button class="secondary" id="refreshButton">Refresh</button>
-    </div>
-
-    <section class="page" id="page-overview">
-      <div class="cards" id="stats"></div>
-      <div class="panel">
-        <h2>Event Status</h2>
-        <p class="muted">Manage event information, participants, teams, matches, and results from the navigation menu.</p>
-        <div id="overviewWinner" class="notice">No winner has been published.</div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-players">
-      <div class="panel">
-        <h2>Add Participant</h2>
-        <div class="gridform">
-          <div><label>Roblox Username</label><input id="newRoblox"></div>
-          <div><label>Discord Username</label><input id="newDiscord"></div>
-          <div><label>Previous Clans</label><input id="newClans"></div>
-        </div>
-        <div class="actions"><button id="addPlayerButton">Add Player</button></div>
-      </div>
-      <div class="panel">
-        <h2>Player Database</h2>
-        <input id="playerSearch" placeholder="Search Roblox or Discord username">
-        <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>PLAYER</th><th>DISCORD</th><th>STATUS</th><th>POINTS</th><th>TEAM</th><th>ACTIONS</th></tr></thead><tbody id="playerRows"></tbody></table></div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-teams">
-      <div class="panel">
-        <h2>Generate Teams</h2>
-        <div class="notice">Team assignments are randomized. Generate or reroll teams before publishing. Once published, teams become visible on the public website.</div>
-        <label>Players per team</label><input id="teamSize" type="number" min="1" value="5">
-        <div class="actions">
-          <button id="generateTeamsButton">Generate / Reroll Teams</button>
-          <button id="publishTeamsButton">Publish Teams</button>
-          <button class="danger" id="resetTeamsButton">Reset Teams</button>
-        </div>
-      </div>
-      <div class="panel"><h2>Teams</h2><div id="teamList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-checkin">
-      <div class="panel">
-        <h2>Participant Check-in</h2>
-        <label>Event</label><select id="checkinEvent"></select>
-        <label>Player</label><select id="checkinPlayer"></select>
-        <label>Status</label><select id="checkinStatus"><option>Present</option><option>Absent</option><option>Late</option></select>
-        <div class="actions"><button id="checkinButton">Save Check-in</button></div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-events">
-      <div class="panel">
-        <h2>Create Event</h2>
-        <label>Event title</label><input id="eventTitle">
-        <label>Description</label><textarea id="eventDescription"></textarea>
-        <label>Start date and time (your local time)</label><input id="eventStart" type="datetime-local">
-        <label>Status</label><select id="eventStatus"><option>Upcoming</option><option>Happening Now</option><option>Completed</option></select>
-        <label><input type="checkbox" id="eventPublished" checked style="width:auto"> Publish event publicly</label>
-        <div class="actions"><button id="addEventButton">Create Event</button></div>
-      </div>
-      <div class="panel"><h2>Current Events</h2><div id="eventList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-matches">
-      <div class="panel">
-        <h2>Create Match</h2>
-        <label>Match title</label><input id="matchTitle">
-        <label>Related event</label><select id="matchEvent"></select>
-        <label>Scheduled date and time (your local time)</label><input id="matchTime" type="datetime-local">
-        <label>Teams (select multiple)</label><select id="matchTeams" multiple size="5"></select>
-        <div class="actions"><button id="addMatchButton">Create Match</button></div>
-      </div>
-      <div class="panel"><h2>Matches</h2><div id="matchList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-points">
-      <div class="panel">
-        <h2>Award Points</h2>
-        <label>Player</label><select id="pointsPlayer"></select>
-        <label>Points to add (negative values are allowed)</label><input id="pointsAmount" type="number" value="10">
-        <div class="actions"><button id="awardPointsButton">Award Points</button></div>
-      </div>
-      <div class="panel">
-        <h2>Add Achievement</h2>
-        <label>Player</label><select id="achievementPlayer"></select>
-        <label>Achievement name</label><input id="achievementName">
-        <div class="actions"><button id="addAchievementButton">Add Achievement</button></div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-challenges">
-      <div class="panel">
-        <h2>Create Bonus Challenge</h2>
-        <label>Title</label><input id="challengeTitle">
-        <label>Description</label><textarea id="challengeDescription"></textarea>
-        <label>Points reward</label><input id="challengePoints" type="number" value="5">
-        <label>Achievement (optional)</label><input id="challengeAchievement">
-        <label><input id="challengePublished" type="checkbox" style="width:auto"> Publish challenge</label>
-        <div class="actions"><button id="addChallengeButton">Create Challenge</button></div>
-      </div>
-      <div class="panel"><h2>Challenges</h2><div id="challengeList"></div></div>
-      <div class="panel">
-        <h2>Complete a Challenge for a Player</h2>
-        <label>Challenge</label><select id="completeChallengeSelect"></select>
-        <label>Player</label><select id="completeChallengePlayer"></select>
-        <div class="actions"><button id="completeChallengeButton">Mark Completed & Award</button></div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-mvp">
-      <div class="panel">
-        <h2>MVP Voting Controls</h2>
-        <div id="mvpStatus" class="notice"></div>
-        <div class="actions">
-          <button id="openMvpButton">Open Voting</button>
-          <button class="secondary" id="closeMvpButton">Close Voting</button>
-          <button class="danger" id="resetMvpButton">Reset Votes</button>
-        </div>
-      </div>
-      <div class="panel"><h2>Voting Results</h2><div id="mvpList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-announcements">
-      <div class="panel">
-        <h2>Create Announcement</h2>
-        <label>Title</label><input id="announcementTitle">
-        <label>Message</label><textarea id="announcementBody"></textarea>
-        <label><input type="checkbox" id="announcementPublished" checked style="width:auto"> Publish immediately</label>
-        <div class="actions"><button id="addAnnouncementButton">Create Announcement</button></div>
-      </div>
-      <div class="panel"><h2>Announcements</h2><div id="announcementList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-winner">
-      <div class="panel">
-        <h2>Publish Winning Team</h2>
-        <div class="notice">Publishing a winner makes the result public and adds the team to event history and the Hall of Fame.</div>
-        <label>Winning team</label><select id="winnerTeam"></select>
-        <label>Announcement message</label><textarea id="winnerMessage">Congratulations to our Nerolympics champions!</textarea>
-        <div class="actions"><button id="publishWinnerButton">Publish Winner</button><button class="danger" id="clearWinnerButton">Clear Winner</button></div>
-        <div id="winnerPreview" class="notice"></div>
-      </div>
-    </section>
-
-    <section class="page hidden" id="page-prizes">
-      <div class="panel">
-        <h2>Add Prize Record</h2>
-        <label>Player</label><select id="prizePlayer"></select>
-        <label>Reward</label><input id="prizeReward">
-        <label><input type="checkbox" id="prizePublic" style="width:auto"> Show this reward publicly</label>
-        <div class="actions"><button id="addPrizeButton">Add Prize</button></div>
-      </div>
-      <div class="panel"><h2>Prize Distribution</h2><div id="prizeList"></div></div>
-    </section>
-
-    <section class="page hidden" id="page-backups">
-      <div class="panel">
-        <h2>Export Complete Event Backup</h2>
-        <p class="muted">Downloads one JSON file containing participants, teams, points, events, matches, results, achievements, challenges, announcements, voting data, prizes, history, and settings.</p>
-        <div class="actions"><button id="exportButton">Export All Data</button></div>
-      </div>
-      <div class="panel">
-        <h2>Import Event Backup</h2>
-        <div class="notice">Admin only. Importing replaces the current event data with the backup. Export your current data first. Select a Nerolympics JSON backup file.</div>
-        <input type="file" id="backupFile" accept=".json,application/json">
-        <div class="actions"><button id="importButton" class="danger">Restore Backup</button></div>
-        <div id="restoreStatus" class="muted"></div>
-      </div>
-    </section>
-  </main>
+<aside class="sidebar">
+<div class="brand">NERO<small>OLYMPICS CONTROL CENTER</small></div>
+<nav class="nav" id="nav"></nav>
+<div class="sidebarfoot"><small id="roleLabel"></small><button class="secondary small" id="logoutButton">Sign Out</button></div>
+</aside>
+<main class="main">
+<header class="top"><div><h1 id="pageTitle">Overview</h1><small id="lastUpdated">Event management system</small></div><div class="row"><span class="role" id="rolePill">STAFF</span><button id="refreshButton">Refresh</button></div></header>
+<div id="pages"></div>
+</main>
 </div>
-
-<div id="toast"></div>
+<div class="toast" id="toast"></div>
+<div class="modal hidden" id="modal"><div class="modalbox"><div class="itemhead"><h2 id="modalTitle">Confirm</h2><button id="modalClose" class="small">Close</button></div><div id="modalBody"></div><div id="modalActions" class="toolbar"></div></div></div>
 
 <script>
-let state = null;
-let currentRole = null;
-let currentPage = "overview";
-
-const $ = id => document.getElementById(id);
-
-function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  })[c]);
+const $=id=>document.getElementById(id);
+let state=null,role="staff",active="overview",analytics=null;
+const navItems=[
+["overview","Overview"],["players","Participants"],["teams","Teams"],["events","Events & Matches"],["checkin","Check-ins"],["scoring","Scoring & Challenges"],["announcements","Announcements"],["awards","MVP & Prizes"],["analytics","Analytics"],["search","Global Search"],["recycle","Recycle Bin"],["history","Version History"],["activity","Activity Log"],["backups","Backups"],["permissions","Staff Permissions"],["maintenance","Maintenance Mode"]
+];
+const permissionNames={
+addPlayer:"Add participants",updatePlayer:"Edit participants",deletePlayer:"Delete participants",generateTeams:"Generate teams",publishTeams:"Publish teams",resetTeams:"Reset teams",updateTeam:"Edit teams",bulkAssignTeam:"Assign participants to teams",checkin:"Individual check-ins",bulkCheckin:"Bulk check-ins",addEvent:"Add events",updateEvent:"Edit events",deleteEvent:"Delete events",addMatch:"Add matches",updateMatch:"Edit matches",completeMatch:"Complete matches",deleteMatch:"Delete matches",awardPoints:"Award points",bulkAwardPoints:"Bulk award points",bulkPlayerStatus:"Bulk update participant status",bulkDeletePlayers:"Bulk delete participants",addChallenge:"Add challenges",completeChallenge:"Complete challenges",deleteChallenge:"Delete challenges",addAnnouncement:"Add announcements",updateAnnouncement:"Edit announcements",deleteAnnouncement:"Delete announcements",bulkPublishAnnouncements:"Bulk publish announcements",bulkDeleteAnnouncements:"Bulk delete announcements",selectMvp:"Select MVP",publishMvp:"Publish MVP",addPrize:"Add prizes",updatePrize:"Edit prizes",deletePrize:"Delete prizes",bulkPrizeDelivered:"Bulk update prize delivery",bulkDeleteTeams:"Bulk delete teams",restoreRecycleItem:"Restore recycle bin items"
+};
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate=v=>v?new Date(v).toLocaleString():"—";
+const num=v=>Number(v||0);
+function toast(m){$("toast").textContent=m;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2800)}
+async function api(url,options={}){const r=await fetch(url,{credentials:"same-origin",headers:{"Content-Type":"application/json",...(options.headers||{})},...options});let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||"Request failed");return d}
+async function action(type,payload={}){await api("/api/staff/action",{method:"POST",body:JSON.stringify({type,payload})});await loadState();toast("Saved successfully.")}
+function adminOnly(){if(role!=="admin"){toast("Administrator access required.");return false}return true}
+function modal(title,body,buttons=[]){$("modalTitle").textContent=title;$("modalBody").innerHTML=body;$("modalActions").innerHTML="";buttons.forEach(b=>{const x=document.createElement("button");x.textContent=b.label;x.className=b.cls||"primary";x.onclick=b.run;$("modalActions").append(x)});$("modal").classList.remove("hidden")}
+function closeModal(){$("modal").classList.add("hidden")}
+function confirmAction(title,records,run){modal(title,`<p>Review the records affected by this action:</p><div class="notice"><b>${records.length} record(s)</b><ul>${records.slice(0,100).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>${records.length>100?"<small>Only the first 100 records are shown.</small>":""}</div><p>This action will be applied after confirmation.</p>`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Confirm",cls:"danger",run:async()=>{closeModal();await run()}}])}
+function page(id,html){return `<section class="page ${active===id?"active":""}" id="page-${id}">${html}</section>`}
+function table(headers,rows){return `<div class="tablewrap"><table><thead><tr>${headers.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${rows||`<tr><td colspan="${headers.length}" class="empty">No records found.</td></tr>`}</tbody></table></div>`}
+function opt(items,value,label){return items.map(x=>`<option value="${esc(x[value])}">${esc(x[label])}</option>`).join("")}
+function btn(label,attrs="",cls=""){return `<button class="${cls}" ${attrs}>${label}</button>`}
+function input(label,id,type="text",value=""){return `<label>${label}</label><input id="${id}" type="${type}" value="${esc(value)}">`}
+function select(label,id,items,value,labelKey){return `<label>${label}</label><select id="${id}">${items.map(x=>`<option value="${esc(x[value])}">${esc(x[labelKey])}</option>`).join("")}</select>`}
+function check(id,label,on=false){return `<label><input class="checkbox" type="checkbox" id="${id}" ${on?"checked":""}> ${label}</label>`}
+function overviewHTML(){
+const s=state;
+return `<div class="grid">
+<div class="card stat"><span>PARTICIPANTS</span><strong>${s.players.length}</strong></div>
+<div class="card stat"><span>TEAMS</span><strong>${s.teams.length}</strong></div>
+<div class="card stat"><span>EVENTS</span><strong>${s.events.length}</strong></div>
+<div class="card stat"><span>ACTIVE MATCHES</span><strong>${s.matches.filter(x=>x.status!=="Completed").length}</strong></div>
+<div class="card stat"><span>ANNOUNCEMENTS</span><strong>${s.announcements.length}</strong></div>
+<div class="card stat"><span>RECYCLE BIN</span><strong>${s.recycleBin.length}</strong></div></div>
+<div class="panel"><h2>Event Control Center</h2><p>Manage participants, teams, activities, scoring and event announcements from this dashboard.</p>
+<div class="toolbar">${btn("Refresh data",'data-action="refresh"',"primary")}${btn("Open global search",'data-page="search"')}${role==="admin"?btn("Undo latest change",'data-action="undo',"secondary"):""}</div>
+<h3>Upcoming and active activities</h3>${table(["Activity","Status","Date"],s.events.filter(x=>x.status!=="Completed").map(x=>`<tr><td>${esc(x.title)}</td><td>${esc(x.status)}</td><td>${fmtDate(x.startAt)}</td></tr>`).join(""))}
+</div>`;
 }
-
-function localDate(value) {
-  if (!value) return "Not scheduled";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Not scheduled" :
-    date.toLocaleString(undefined, {dateStyle:"medium",timeStyle:"short"});
+function playersHTML(){
+const rows=state.players.map(p=>`<tr><td><input class="checkbox selectPlayer" type="checkbox" value="${p.id}"></td><td>${esc(p.roblox)}</td><td>${esc(p.discord||"—")}</td><td>${esc(p.status)}</td><td>${num(p.points)}</td><td>${esc(state.teams.find(t=>t.id===p.teamId)?.name||"Unassigned")}</td><td><button class="small" data-edit-player="${p.id}">Edit</button> <button class="small danger" data-delete-player="${p.id}">Delete</button></td></tr>`).join("");
+return `<div class="panel"><h2>Add Participant</h2><div class="formgrid">${input("Roblox username","newRoblox")}${input("Discord username","newDiscord")}${select("Status","newPlayerStatus",[{status:"Registered"},{status:"Checked In"},{status:"Disqualified"}],"status","status")}</div>${btn("Add participant",'data-action="add-player"',"primary")}</div>
+<div class="panel"><h2>Participants</h2><input id="playerFilter" placeholder="Search participants..."><div class="toolbar">${btn("Select all",'data-action="select-all"')}${btn("Bulk status",'data-action="bulk-status"')}${btn("Bulk award points",'data-action="bulk-points"')}${btn("Assign team",'data-action="bulk-team"')}${btn("Bulk delete",'data-action="bulk-delete-players"',"danger")}</div>
+${table(["","Roblox","Discord","Status","Points","Team","Actions"],rows)}</div>`;
 }
-
-function toast(message) {
-  const el = $("toast");
-  el.textContent = message;
-  el.style.display = "block";
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.style.display = "none", 3500);
+function teamsHTML(){
+const rows=state.teams.map(t=>`<tr><td>${esc(t.name)}</td><td>${esc(t.captain||"—")}</td><td>${(t.memberIds||[]).length}</td><td>${num(t.points)}</td><td>${num(t.wins)}</td><td><button class="small" data-edit-team="${t.id}">Edit</button></td></tr>`).join("");
+return `<div class="panel"><h2>Team Generation</h2><div class="row"><div>${input("Players per team","teamSize","number","5")}</div><div class="toolbar">${btn("Generate random teams",'data-action="generate-teams"',"primary")}${btn("Publish teams",'data-action="publish-teams"')}${btn("Reset teams",'data-action="reset-teams"',"danger")}</div></div><p class="muted">Generating teams replaces the current teams and moves the old teams into the Recycle Bin.</p></div><div class="panel"><h2>Teams</h2>${table(["Team","Captain","Players","Points","Wins","Actions"],rows)}</div>`;
 }
-
-async function api(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : {"Content-Type":"application/json"}),
-      ...(options.headers || {})
-    }
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Request failed.");
-  return data;
+function eventsHTML(){
+const erows=state.events.map(e=>`<tr><td>${esc(e.title)}</td><td>${esc(e.status)}</td><td>${fmtDate(e.startAt)}</td><td>${e.published?"Published":"Hidden"}</td><td><button class="small" data-edit-event="${e.id}">Edit</button> <button class="small danger" data-delete-event="${e.id}">Delete</button></td></tr>`).join("");
+const mrows=state.matches.map(m=>`<tr><td>${esc(m.title)}</td><td>${esc(m.status)}</td><td>${fmtDate(m.scheduledAt)}</td><td>${esc(state.teams.find(t=>t.id===m.winnerTeamId)?.name||"—")}</td><td>${m.status==="Completed"?"Completed":`<select id="winner-${m.id}"><option value="">No winner</option>${opt(state.teams,"id","name")}</select> <button class="small" data-complete-match="${m.id}">Complete</button>`} <button class="small danger" data-delete-match="${m.id}">Delete</button></td></tr>`).join("");
+return `<div class="panel"><h2>Create Event</h2>${input("Title","eventTitle")}${input("Description","eventDescription")}${input("Start time","eventStart","datetime-local")}<div class="toolbar">${btn("Create event",'data-action="add-event"',"primary")}</div></div>
+<div class="panel"><h2>Events</h2>${table(["Event","Status","Start","Visibility","Actions"],erows)}</div>
+<div class="panel"><h2>Create Match</h2>${input("Match title","matchTitle")}${select("Event","matchEvent",state.events,"id","title")}<label>Scheduled time</label><input id="matchTime" type="datetime-local">${btn("Create match",'data-action="add-match"',"primary")}</div>
+<div class="panel"><h2>Matches</h2>${table(["Match","Status","Scheduled","Winner","Actions"],mrows)}</div>`;
 }
-
-async function action(type, payload = {}) {
-  await api("/api/staff/action", {
-    method:"POST",
-    body:JSON.stringify({type,payload})
-  });
-  await loadState();
-  toast("Saved successfully.");
+function checkinHTML(){
+return `<div class="panel"><h2>Check-in Management</h2>${select("Event","checkinEvent",state.events,"id","title")}<div class="toolbar">${btn("Mark selected present",'data-action="bulk-present"',"primary")}${btn("Mark selected absent",'data-action="bulk-absent"')}${btn("Mark selected late",'data-action="bulk-late"')}</div>${table(["","Participant","Current status","Last check-in"],state.players.map(p=>{const c=(p.checkIns||[]).find(x=>x.eventId===$("checkinEvent")?.value);return `<tr><td><input class="checkbox selectPlayer" type="checkbox" value="${p.id}"></td><td>${esc(p.roblox)}</td><td>${esc(c?.status||"Not checked in")}</td><td>${fmtDate(c?.timestamp)}</td></tr>`}).join(""))}</div>`;
 }
-
-async function login(username, password) {
-  const result = await api("/api/staff/login", {
-    method:"POST",
-    body:JSON.stringify({username,password})
-  });
-  currentRole = result.role;
-  $("loginScreen").classList.add("hidden");
-  $("dashboard").classList.remove("hidden");
-  $("roleLabel").textContent = currentRole === "admin" ? "Administrator" : "Staff member";
-  $("importButton").disabled = currentRole !== "admin";
-  await loadState();
+function scoringHTML(){
+const rows=state.challenges.map(c=>`<tr><td>${esc(c.title)}</td><td>${num(c.points)}</td><td>${c.published?"Published":"Hidden"}</td><td><select id="challengePlayer-${c.id}"><option value="">Choose participant</option>${opt(state.players,"id","roblox")}</select> <button class="small" data-complete-challenge="${c.id}">Complete</button> <button class="small danger" data-delete-challenge="${c.id}">Delete</button></td></tr>`).join("");
+return `<div class="panel"><h2>Award Points</h2>${select("Participant","awardPlayer",state.players,"id","roblox")}${input("Points to add","awardAmount","number","10")}${btn("Award points",'data-action="award-points"',"primary")}</div>
+<div class="panel"><h2>Create Challenge</h2>${input("Challenge title","challengeTitle")}${input("Description","challengeDescription")}${input("Points","challengePoints","number","10")}${input("Achievement name (optional)","challengeAchievement")}${check("challengePublished","Publish challenge")}${btn("Create challenge",'data-action="add-challenge"',"primary")}</div>
+<div class="panel"><h2>Challenges</h2>${table(["Challenge","Points","Visibility","Actions"],rows)}</div>`;
 }
-
-async function checkSession() {
-  try {
-    const result = await api("/api/staff/me");
-    if (result.authenticated) {
-      currentRole = result.role;
-      $("loginScreen").classList.add("hidden");
-      $("dashboard").classList.remove("hidden");
-      $("roleLabel").textContent = currentRole === "admin" ? "Administrator" : "Staff member";
-      $("importButton").disabled = currentRole !== "admin";
-      await loadState();
-    }
-  } catch (error) {
-    console.error(error);
-  }
+function announcementsHTML(){
+const rows=state.announcements.map(a=>`<tr><td>${esc(a.title)}</td><td>${a.published?"Published":"Draft"}</td><td>${fmtDate(a.createdAt)}</td><td><button class="small" data-toggle-announcement="${a.id}">${a.published?"Unpublish":"Publish"}</button> <button class="small" data-edit-announcement="${a.id}">Edit</button> <button class="small danger" data-delete-announcement="${a.id}">Delete</button></td></tr>`).join("");
+return `<div class="panel"><h2>Create Announcement</h2>${input("Title","announcementTitle")}<label>Message</label><textarea id="announcementBody"></textarea>${check("announcementPublished","Publish immediately")}${btn("Create announcement",'data-action="add-announcement"',"primary")}</div><div class="panel"><h2>Announcements</h2><div class="toolbar">${btn("Publish selected",'data-action="bulk-publish"')}${btn("Delete selected",'data-action="bulk-delete-announcements"',"danger")}</div>${table(["Title","Status","Created","Actions"],rows)}</div>`;
 }
-
-async function loadState() {
-  state = await api("/api/staff/state");
-  renderAll();
-  $("lastUpdated").textContent = "Last updated " + new Date().toLocaleTimeString();
+function awardsHTML(){
+const m=state.settings.mvp||{};
+const prizes=state.prizes.map(p=>`<tr><td>${esc(p.playerName)}</td><td>${esc(p.reward)}</td><td>${p.delivered?"Delivered":"Pending"}</td><td><button class="small" data-toggle-prize="${p.id}">Toggle delivered</button> <button class="small danger" data-delete-prize="${p.id}">Delete</button></td></tr>`).join("");
+return `<div class="panel"><h2>Winner Announcement</h2>${select("Winning team","winnerTeam",state.teams,"id","name")}${input("Winner message","winnerMessage")}${btn("Publish winner",'data-action="publish-winner"',"primary")} ${btn("Clear winner",'data-action="clear-winner"',"danger")}</div>
+<div class="panel"><h2>Manual MVP Selection</h2>${select("MVP participant","mvpPlayer",state.players,"id","roblox")}${input("MVP message","mvpMessage")}${btn("Save MVP selection",'data-action="select-mvp"')}${btn("Publish MVP",'data-action="publish-mvp"',"primary")}<p class="muted">MVP is selected by staff. There is no public voting.</p></div>
+<div class="panel"><h2>Add Prize</h2>${select("Participant","prizePlayer",state.players,"id","roblox")}${input("Reward","prizeReward")}${check("prizeDelivered","Already delivered")}${check("prizePublic","Show publicly")}${btn("Add prize",'data-action="add-prize"',"primary")}</div>
+<div class="panel"><h2>Prizes</h2><div class="toolbar">${btn("Mark selected delivered",'data-action="bulk-prizes")}</div>${table(["Participant","Reward","Delivery","Actions"],prizes)}</div>`;
 }
-
-function playerName(id) {
-  return state.players.find(p => p.id === id)?.roblox || "Unknown player";
+function analyticsHTML(){return `<div class="panel"><h2>Event Analytics</h2><button class="primary" data-action="load-analytics">Refresh analytics</button><div id="analyticsResults" class="notice">${analytics?JSON.stringify(analytics,null,2):"Load analytics to view participation and team performance."}</div></div>`}
+function searchHTML(){return `<div class="panel"><h2>Global Search</h2><input id="globalQuery" placeholder="Search players, teams, matches, announcements, prizes..."><button class="primary" data-action="search">Search</button><div id="searchResults"></div></div>`}
+function recycleHTML(){return `<div class="panel"><h2>Recycle Bin</h2><p class="muted">Deleted records are held here until restored or permanently deleted.</p>${table(["Type","Record","Deleted","Actions"],state.recycleBin.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.record?.roblox||x.record?.name||x.record?.title||x.record?.reward||x.type)}</td><td>${fmtDate(x.deletedAt)}</td><td><button class="small" data-restore="${x.id}">Restore</button>${role==="admin"?` <button class="small danger" data-permanent="${x.id}">Delete forever</button>`:""}</td></tr>`).join(""))}<div class="toolbar">${role==="admin"?btn("Empty Recycle Bin",'data-action="empty-recycle"',"danger"):""}</div></div>`}
+function historyHTML(){return `<div class="panel"><h2>Version History</h2><p class="muted">Review earlier saved versions and restore one if needed.</p>${table(["Summary","Saved","Actions"],state.versions.map(v=>`<tr><td>${esc(v.summary)}</td><td>${fmtDate(v.createdAt)}</td><td><button class="small" data-preview-version="${v.id}">Preview</button> ${role==="admin"?`<button class="small danger" data-restore-version="${v.id}">Restore</button>`:""}</td></tr>`).join(""))}</div>`}
+function activityHTML(){return `<div class="panel"><h2>Activity Log</h2><p class="muted">The activity log does not identify individual staff members.</p>${table(["Activity","Time"],state.activityLog.map(x=>`<tr><td>${esc(x.summary)}</td><td>${fmtDate(x.createdAt)}</td></tr>`).join(""))}</div>`}
+function backupsHTML(){return `<div class="panel"><h2>Data Protection</h2><p>Export a complete JSON backup, import a previous backup, or create a database backup.</p><div class="toolbar">${btn("Export all data",'data-action="export"',"primary")}${btn("Create database backup",'data-action="create-backup"')}</div><label>Choose backup JSON file</label><input type="file" id="backupFile" accept="application/json"><button class="danger" data-action="import-backup">Validate and import backup</button><h3>Automatic Backups</h3><div id="backupList">Admin access required to view backup history.</div></div>`}
+function permissionsHTML(){const perms=state.settings.staffPermissions||{};return `<div class="panel"><h2>Staff Permissions Manager</h2><p class="muted">Choose which actions the standard staff login can perform. Admins always retain full access.</p><div id="permissionList">${Object.entries(permissionNames).map(([key,label])=>`<label class="permission">${esc(label)}<input class="permissionCheck" type="checkbox" data-permission="${key}" ${perms[key]?"checked":""}></label>`).join("")}</div><div class="toolbar">${btn("Save permissions",'data-action="save-permissions"',"primary")}${btn("Restore defaults",'data-action="reset-permissions"')}</div></div>`}
+function maintenanceHTML(){return `<div class="panel"><h2>Public Maintenance Mode</h2><p>When enabled, visitors see your maintenance message. Staff access remains available.</p>${check("maintenanceEnabled","Enable maintenance mode",state.settings.maintenanceMode)}<label>Public message</label><textarea id="maintenanceMessage">${esc(state.settings.maintenanceMessage||"The Nerolympics website is temporarily under maintenance. Please check back soon.")}</textarea>${btn("Save maintenance settings",'data-action="save-maintenance"',"primary")}</div>`}
+function render(){
+$("nav").innerHTML=navItems.map(([id,label])=>`<button data-page="${id}" class="${active===id?"active":""}">${label}</button>`).join("");
+$("pageTitle").textContent=navItems.find(x=>x[0]===active)?.[1]||"Overview";
+$("roleLabel").textContent=role==="admin"?"Administrator access":"Standard staff access";
+$("rolePill").textContent=role.toUpperCase();
+$("pages").innerHTML=[
+page("overview",overviewHTML()),page("players",playersHTML()),page("teams",teamsHTML()),page("events",eventsHTML()),page("checkin",checkinHTML()),page("scoring",scoringHTML()),page("announcements",announcementsHTML()),page("awards",awardsHTML()),page("analytics",analyticsHTML()),page("search",searchHTML()),page("recycle",recycleHTML()),page("history",historyHTML()),page("activity",activityHTML()),page("backups",backupsHTML()),page("permissions",permissionsHTML()),page("maintenance",maintenanceHTML())
+].join("");
 }
-
-function teamName(id) {
-  return state.teams.find(t => t.id === id)?.name || "Unassigned";
+function showPage(id){active=id;render()}
+async function loadState(){state=await api("/api/staff/state");$("lastUpdated").textContent="Last refreshed: "+new Date().toLocaleTimeString();render()}
+function selectedPlayers(){return [...document.querySelectorAll(".selectPlayer:checked")].map(x=>x.value)}
+function selectedAnnouncements(){return [...document.querySelectorAll(".selectAnnouncement:checked")].map(x=>x.value)}
+function requireSelection(ids){if(!ids.length){toast("Select at least one record first.");return false}return true}
+async function exportData(){if(!adminOnly())return;const data=await api("/api/staff/backup");const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nerolympics-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(a.href)}
+async function importData(){if(!adminOnly())return;const f=$("backupFile").files[0];if(!f)return toast("Choose a backup file first.");let backup;try{backup=JSON.parse(await f.text())}catch{return toast("That file is not valid JSON.")}modal("Confirm backup import","The selected backup will replace current event records. The server validates the file and saves a snapshot first.",[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Validate and restore",cls:"danger",run:async()=>{closeModal();await api("/api/staff/action",{method:"POST",body:JSON.stringify({type:"importBackup",payload:{backup}})});await loadState();toast("Backup restored.")}}])}
+async function loadBackups(){if(!adminOnly())return;const rows=await api("/api/staff/backups");$("backupList").innerHTML=rows.map(x=>`<div class="item">${fmtDate(x.created_at)}</div>`).join("")||"No backups found."}
+document.addEventListener("click",async e=>{
+const t=e.target;
+try{
+if(t.dataset.page){showPage(t.dataset.page);return}
+if(t.dataset.action){
+switch(t.dataset.action){
+case"refresh":await loadState();break;
+case"add-player":await action("addPlayer",{roblox:$("newRoblox").value,discord:$("newDiscord").value,status:$("newPlayerStatus").value});break;
+case"select-all":document.querySelectorAll(".selectPlayer").forEach(x=>x.checked=true);break;
+case"bulk-status":{const ids=selectedPlayers();if(!requireSelection(ids))break;modal("Bulk status update",`<label>New status</label><select id="bulkStatus"><option>Registered</option><option>Checked In</option><option>Active</option><option>Disqualified</option></select>`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Apply",run:async()=>{closeModal();await action("bulkPlayerStatus",{playerIds:ids,status:$("bulkStatus").value})}}]);break}
+case"bulk-points":{const ids=selectedPlayers();if(!requireSelection(ids))break;modal("Bulk award points",`<label>Points to add to each selected participant</label><input id="bulkAmount" type="number" value="10">`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Continue",run:()=>{const amount=Number($("bulkAmount").value);closeModal();confirmAction("Confirm bulk points",ids.map(id=>state.players.find(p=>p.id===id)?.roblox||id),()=>action("bulkAwardPoints",{playerIds:ids,amount}))}}]);break}
+case"bulk-team":{const ids=selectedPlayers();if(!requireSelection(ids))break;modal("Assign selected participants",`<label>Team</label><select id="bulkTeam"><option value="">Unassigned</option>${opt(state.teams,"id","name")}</select>`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Assign",run:async()=>{const teamId=$("bulkTeam").value;closeModal();await action("bulkAssignTeam",{playerIds:ids,teamId:teamId||null})}}]);break}
+case"bulk-delete-players":{const ids=selectedPlayers();if(!requireSelection(ids))break;confirmAction("Delete selected participants",ids.map(id=>state.players.find(p=>p.id===id)?.roblox||id),()=>action("bulkDeletePlayers",{playerIds:ids}));break}
+case"generate-teams":await action("generateTeams",{size:Number($("teamSize").value||5)});break;
+case"publish-teams":await action("publishTeams");break;
+case"reset-teams":confirmAction("Reset all teams",state.teams.map(x=>x.name),()=>action("resetTeams"));break;
+case"add-event":{const local=$("eventStart").value;await action("addEvent",{title:$("eventTitle").value,description:$("eventDescription").value,startAt:local?new Date(local).toISOString():null,status:"Upcoming",published:true});break}
+case"add-match":{const local=$("matchTime").value;await action("addMatch",{title:$("matchTitle").value,eventId:$("matchEvent").value||null,scheduledAt:local?new Date(local).toISOString():null,published:true});break}
+case"bulk-present":case"bulk-absent":case"bulk-late":{const ids=selectedPlayers();if(!requireSelection(ids))break;const status={"bulk-present":"Present","bulk-absent":"Absent","bulk-late":"Late"}[t.dataset.action];await action("bulkCheckin",{playerIds:ids,eventId:$("checkinEvent").value,status});break}
+case"award-points":await action("awardPoints",{playerId:$("awardPlayer").value,amount:Number($("awardAmount").value)});break;
+case"add-challenge":await action("addChallenge",{title:$("challengeTitle").value,description:$("challengeDescription").value,points:Number($("challengePoints").value),achievement:$("challengeAchievement").value,published:$("challengePublished").checked});break;
+case"add-announcement":await action("addAnnouncement",{title:$("announcementTitle").value,body:$("announcementBody").value,published:$("announcementPublished").checked});break;
+case"bulk-publish":{const ids=selectedAnnouncements();if(!requireSelection(ids))break;await action("bulkPublishAnnouncements",{ids,published:true});break}
+case"bulk-delete-announcements":{const ids=selectedAnnouncements();if(!requireSelection(ids))break;confirmAction("Delete selected announcements",ids.map(id=>state.announcements.find(x=>x.id===id)?.title||id),()=>action("bulkDeleteAnnouncements",{ids}));break}
+case"publish-winner":await action("publishWinner",{teamId:$("winnerTeam").value,message:$("winnerMessage").value});break;
+case"clear-winner":confirmAction("Clear published winner",state.winner?[state.winner.teamName]:["Current winner"],()=>action("clearWinner"));break;
+case"select-mvp":await action("selectMvp",{playerId:$("mvpPlayer").value,message:$("mvpMessage").value});break;
+case"publish-mvp":await action("publishMvp");break;
+case"add-prize":await action("addPrize",{playerId:$("prizePlayer").value,reward:$("prizeReward").value,delivered:$("prizeDelivered").checked,public:$("prizePublic").checked});break;
+case"bulk-prizes":{const ids=[...document.querySelectorAll(".selectPrize:checked")].map(x=>x.value);if(!requireSelection(ids))break;await action("bulkPrizeDelivered",{ids,delivered:true});break}
+case"load-analytics":analytics=await api("/api/staff/analytics");$("analyticsResults").textContent=JSON.stringify(analytics,null,2);break;
+case"search":{const q=$("globalQuery").value;const results=await api("/api/staff/search?q="+encodeURIComponent(q));$("searchResults").innerHTML=table(["Type","Record","Details"],results.map(x=>`<tr><td>${esc(x.type)}</td><td>${esc(x.label)}</td><td>${esc(x.detail||"")}</td></tr>`).join(""));break}
+case"empty-recycle":if(adminOnly())confirmAction("Permanently empty Recycle Bin",state.recycleBin.map(x=>x.record?.roblox||x.record?.name||x.record?.title||x.type),()=>action("emptyRecycleBin"));break;
+case"undo":if(adminOnly())confirmAction("Undo latest change",["Restore the most recent saved version."],()=>action("undo"));break;
+case"export":await exportData();break;
+case"create-backup":if(adminOnly()){await api("/api/staff/action",{method:"POST",body:JSON.stringify({type:"createBackup",payload:{}})});toast("Database backup created.");await loadBackups()}break;
+case"import-backup":await importData();break;
+case"save-permissions":if(adminOnly()){const permissions={};document.querySelectorAll(".permissionCheck").forEach(x=>permissions[x.dataset.permission]=x.checked);await action("updatePermissions",{permissions})}break;
+case"reset-permissions":if(adminOnly()){const permissions={};Object.keys(permissionNames).forEach(k=>permissions[k]=true);await action("updatePermissions",{permissions})}break;
+case"save-maintenance":if(adminOnly())await action("setMaintenance",{enabled:$("maintenanceEnabled").checked,message:$("maintenanceMessage").value});break;
 }
-
-function fillSelect(id, items, labelFunction, includeEmpty = false) {
-  const select = $(id);
-  if (!select) return;
-
-  const previous = select.value;
-  select.innerHTML = (includeEmpty ? '<option value="">Select...</option>' : "") +
-    items.map(item =>
-      `<option value="${escapeHTML(item.id)}">${escapeHTML(labelFunction(item))}</option>`
-    ).join("");
-
-  if (items.some(item => item.id === previous)) select.value = previous;
-}
-
-function renderAll() {
-  renderOverview();
-  renderPlayers();
-  renderTeams();
-  renderEvents();
-  renderMatches();
-  renderChallenges();
-  renderMvp();
-  renderAnnouncements();
-  renderWinner();
-  renderPrizes();
-  renderSelects();
-}
-
-function renderOverview() {
-  const completed = state.matches.filter(m => m.status === "completed").length;
-  $("stats").innerHTML = [
-    ["Participants",state.players.length],
-    ["Teams",state.teams.length],
-    ["Matches Completed",completed],
-    ["Events",state.events.length],
-    ["Announcements",state.announcements.length],
-    ["Prize Records",state.prizes.length]
-  ].map(([label,value]) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`).join("");
-
-  $("overviewWinner").textContent = state.winner
-    ? "Published winner: " + state.winner.teamName
-    : "No winner has been published.";
-}
-
-function renderPlayers() {
-  const query = $("playerSearch").value.toLowerCase();
-  const rows = state.players.filter(p =>
-    `${p.roblox} ${p.discord}`.toLowerCase().includes(query)
-  );
-
-  $("playerRows").innerHTML = rows.map(p => `
-    <tr>
-      <td>${escapeHTML(p.roblox)}</td>
-      <td>${escapeHTML(p.discord)}</td>
-      <td>${escapeHTML(p.status)}</td>
-      <td>${Number(p.points || 0)}</td>
-      <td>${escapeHTML(teamName(p.teamId))}</td>
-      <td>
-        <button class="secondary" data-edit-player="${escapeHTML(p.id)}">Edit</button>
-        <button class="danger" data-delete-player="${escapeHTML(p.id)}">Delete</button>
-      </td>
-    </tr>
-  `).join("") || '<tr><td colspan="6">No participants found.</td></tr>';
-}
-
-function renderTeams() {
-  $("teamList").innerHTML = state.teams.map(team => `
-    <div class="item">
-      <strong>${escapeHTML(team.name)}</strong>
-      <small>Captain: ${escapeHTML(team.captain || "Not assigned")} · Wins: ${Number(team.wins || 0)} · Points: ${Number(team.points || 0)}</small>
-      <div class="muted">Members: ${(team.memberIds || []).map(playerName).map(escapeHTML).join(", ") || "None"}</div>
-      <div class="actions"><button class="secondary" data-edit-team="${escapeHTML(team.id)}">Edit Name / Captain</button></div>
-    </div>
-  `).join("") || '<div class="notice">No teams generated yet.</div>';
-}
-
-function renderEvents() {
-  $("eventList").innerHTML = state.events.map(event => `
-    <div class="item">
-      <strong>${escapeHTML(event.title)}</strong>
-      <small>${escapeHTML(event.status)} · ${escapeHTML(localDate(event.startAt))}</small>
-      <div class="muted">${escapeHTML(event.description)}</div>
-      <div class="actions">
-        <button class="secondary" data-toggle-event="${escapeHTML(event.id)}">${event.published ? "Unpublish" : "Publish"}</button>
-        <button class="danger" data-delete-event="${escapeHTML(event.id)}">Delete</button>
-      </div>
-    </div>
-  `).join("") || '<div class="notice">No events created.</div>';
-}
-
-function renderMatches() {
-  $("matchList").innerHTML = state.matches.map(match => `
-    <div class="item">
-      <strong>${escapeHTML(match.title)}</strong>
-      <small>${escapeHTML(match.status)} · ${escapeHTML(localDate(match.scheduledAt))}</small>
-      <div class="muted">Teams: ${(match.teamIds || []).map(teamName).map(escapeHTML).join(", ") || "None"}</div>
-      ${match.status !== "completed" ? `
-        <div class="actions">
-          <select id="winner-${escapeHTML(match.id)}">
-            ${state.teams.filter(t => (match.teamIds || []).includes(t.id)).map(t =>
-              `<option value="${escapeHTML(t.id)}">${escapeHTML(t.name)}</option>`
-            ).join("")}
-          </select>
-          <button data-complete-match="${escapeHTML(match.id)}">Record Winner (+10 team points)</button>
-        </div>` : `<div class="muted">Winner: ${escapeHTML(teamName(match.winnerTeamId))}</div>`}
-    </div>
-  `).join("") || '<div class="notice">No matches created.</div>';
-}
-
-function renderChallenges() {
-  $("challengeList").innerHTML = state.challenges.map(challenge => `
-    <div class="item">
-      <strong>${escapeHTML(challenge.title)}</strong>
-      <small>${Number(challenge.points)} points · ${(challenge.completedBy || []).length} completions · ${challenge.published ? "Published" : "Unpublished"}</small>
-      <div class="muted">${escapeHTML(challenge.description)}</div>
-      <div class="actions"><button class="danger" data-delete-challenge="${escapeHTML(challenge.id)}">Delete</button></div>
-    </div>
-  `).join("") || '<div class="notice">No bonus challenges created.</div>';
-}
-
-function renderMvp() {
-  $("mvpStatus").textContent = state.settings.mvpOpen ? "MVP voting is open." : "MVP voting is closed.";
-  api("/api/mvp").then(data => {
-    $("mvpList").innerHTML = data.results.map((item,index) => `
-      <div class="item"><strong>${index + 1}. ${escapeHTML(item.roblox)}</strong><small>${Number(item.votes)} votes</small></div>
-    `).join("") || '<div class="notice">No votes yet.</div>';
-  }).catch(() => $("mvpList").textContent = "Could not load voting results.");
-}
-
-function renderAnnouncements() {
-  $("announcementList").innerHTML = state.announcements.map(item => `
-    <div class="item">
-      <strong>${escapeHTML(item.title)}</strong>
-      <small>${item.published ? "Published" : "Draft"} · ${escapeHTML(localDate(item.createdAt))}</small>
-      <div class="muted">${escapeHTML(item.body)}</div>
-      <div class="actions">
-        <button class="secondary" data-toggle-announcement="${escapeHTML(item.id)}">${item.published ? "Unpublish" : "Publish"}</button>
-        <button class="danger" data-delete-announcement="${escapeHTML(item.id)}">Delete</button>
-      </div>
-    </div>
-  `).join("") || '<div class="notice">No announcements created.</div>';
-}
-
-function renderWinner() {
-  $("winnerPreview").textContent = state.winner
-    ? `Currently published: ${state.winner.teamName}`
-    : "No winner currently published.";
-}
-
-function renderPrizes() {
-  $("prizeList").innerHTML = state.prizes.map(prize => `
-    <div class="item">
-      <strong>${escapeHTML(prize.playerName)} — ${escapeHTML(prize.reward)}</strong>
-      <small>${prize.delivered ? "Delivered" : "Not delivered"} · ${prize.public ? "Public record" : "Private record"}</small>
-      <div class="actions"><button class="secondary" data-toggle-prize="${escapeHTML(prize.id)}">${prize.delivered ? "Mark Not Delivered" : "Mark Delivered"}</button></div>
-    </div>
-  `).join("") || '<div class="notice">No prize records created.</div>';
-}
-
-function renderSelects() {
-  fillSelect("checkinPlayer",state.players,p => p.roblox,true);
-  fillSelect("pointsPlayer",state.players,p => p.roblox,true);
-  fillSelect("achievementPlayer",state.players,p => p.roblox,true);
-  fillSelect("completeChallengePlayer",state.players,p => p.roblox,true);
-  fillSelect("prizePlayer",state.players,p => p.roblox,true);
-  fillSelect("winnerTeam",state.teams,t => t.name,true);
-  fillSelect("checkinEvent",state.events,e => e.title,true);
-  fillSelect("matchEvent",state.events,e => e.title,true);
-  fillSelect("matchTeams",state.teams,t => t.name);
-  fillSelect("completeChallengeSelect",state.challenges,c => c.title,true);
-}
-
-function showPage(page) {
-  currentPage = page;
-  document.querySelectorAll(".page").forEach(el => el.classList.add("hidden"));
-  $("page-" + page).classList.remove("hidden");
-  document.querySelectorAll(".navbtn[data-page]").forEach(btn =>
-    btn.classList.toggle("active",btn.dataset.page === page)
-  );
-  $("pageTitle").textContent = document.querySelector(`[data-page="${page}"]`).textContent;
-}
-
-$("loginForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  try {
-    await login($("loginUsername").value,$("loginPassword").value);
-    toast("Welcome to staff control.");
-  } catch(error) {
-    alert(error.message);
-  }
+return}
+if(t.dataset.editPlayer){const p=state.players.find(x=>x.id===t.dataset.editPlayer);modal("Edit participant",`<label>Roblox username</label><input id="editRoblox" value="${esc(p.roblox)}"><label>Discord username</label><input id="editDiscord" value="${esc(p.discord)}"><label>Status</label><input id="editStatus" value="${esc(p.status)}"><label>Points</label><input id="editPoints" type="number" value="${num(p.points)}">`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Save",run:async()=>{closeModal();await action("updatePlayer",{id:p.id,roblox:$("editRoblox").value,discord:$("editDiscord").value,status:$("editStatus").value,points:Number($("editPoints").value)})}}])}
+if(t.dataset.deletePlayer){const p=state.players.find(x=>x.id===t.dataset.deletePlayer);confirmAction("Delete participant",[p.roblox],()=>action("deletePlayer",{id:p.id}))}
+if(t.dataset.editTeam){const x=state.teams.find(y=>y.id===t.dataset.editTeam);modal("Edit team",`<label>Team name</label><input id="editTeamName" value="${esc(x.name)}"><label>Captain</label><input id="editCaptain" value="${esc(x.captain||"")}"><label>Team members</label><select id="editMembers" multiple size="8">${state.players.map(p=>`<option value="${p.id}" ${(x.memberIds||[]).includes(p.id)?"selected":""}>${esc(p.roblox)}</option>`).join("")}</select>`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Save",run:async()=>{const memberIds=[...$("editMembers").selectedOptions].map(o=>o.value);closeModal();await action("updateTeam",{id:x.id,name:$("editTeamName").value,captain:$("editCaptain").value,memberIds})}}])}
+if(t.dataset.editEvent){const x=state.events.find(y=>y.id===t.dataset.editEvent);modal("Edit event",`<label>Title</label><input id="editTitle" value="${esc(x.title)}"><label>Description</label><textarea id="editDescription">${esc(x.description)}</textarea><label>Status</label><select id="editStatus"><option>Upcoming</option><option>Happening Now</option><option>Completed</option></select>${check("editPublished","Published",x.published)}`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Save",run:async()=>{closeModal();await action("updateEvent",{id:x.id,title:$("editTitle").value,description:$("editDescription").value,status:$("editStatus").value,published:$("editPublished").checked})}}])}
+if(t.dataset.deleteEvent){const x=state.events.find(y=>y.id===t.dataset.deleteEvent);confirmAction("Delete event",[x.title],()=>action("deleteEvent",{id:x.id}))}
+if(t.dataset.completeMatch){const x=state.matches.find(y=>y.id===t.dataset.completeMatch);await action("completeMatch",{matchId:x.id,winnerTeamId:$("winner-"+x.id).value||null,awardPoints:true})}
+if(t.dataset.deleteMatch){const x=state.matches.find(y=>y.id===t.dataset.deleteMatch);confirmAction("Delete match",[x.title],()=>action("deleteMatch",{id:x.id}))}
+if(t.dataset.completeChallenge){await action("completeChallenge",{challengeId:t.dataset.completeChallenge,playerId:$("challengePlayer-"+t.dataset.completeChallenge).value})}
+if(t.dataset.deleteChallenge){const x=state.challenges.find(y=>y.id===t.dataset.deleteChallenge);confirmAction("Delete challenge",[x.title],()=>action("deleteChallenge",{id:x.id}))}
+if(t.dataset.toggleAnnouncement){const x=state.announcements.find(y=>y.id===t.dataset.toggleAnnouncement);await action("updateAnnouncement",{id:x.id,published:!x.published})}
+if(t.dataset.editAnnouncement){const x=state.announcements.find(y=>y.id===t.dataset.editAnnouncement);modal("Edit announcement",`<label>Title</label><input id="editTitle" value="${esc(x.title)}"><label>Message</label><textarea id="editBody">${esc(x.body)}</textarea>${check("editPublished","Published",x.published)}`,[{label:"Cancel",cls:"secondary",run:closeModal},{label:"Save",run:async()=>{closeModal();await action("updateAnnouncement",{id:x.id,title:$("editTitle").value,body:$("editBody").value,published:$("editPublished").checked})}}])}
+if(t.dataset.deleteAnnouncement){const x=state.announcements.find(y=>y.id===t.dataset.deleteAnnouncement);confirmAction("Delete announcement",[x.title],()=>action("deleteAnnouncement",{id:x.id}))}
+if(t.dataset.togglePrize){const x=state.prizes.find(y=>y.id===t.dataset.togglePrize);await action("updatePrize",{id:x.id,delivered:!x.delivered})}
+if(t.dataset.deletePrize){const x=state.prizes.find(y=>y.id===t.dataset.deletePrize);confirmAction("Delete prize",[x.playerName+": "+x.reward],()=>action("deletePrize",{id:x.id}))}
+if(t.dataset.restore){const x=state.recycleBin.find(y=>y.id===t.dataset.restore);confirmAction("Restore record",[x.record?.roblox||x.record?.name||x.record?.title||x.type],()=>action("restoreRecycleItem",{id:x.id}))}
+if(t.dataset.permanent){if(!adminOnly())return;const x=state.recycleBin.find(y=>y.id===t.dataset.permanent);confirmAction("Permanently delete record",[x.record?.roblox||x.record?.name||x.record?.title||x.type],()=>action("permanentDeleteRecycleItem",{id:x.id}))}
+if(t.dataset.previewVersion){const v=state.versions.find(x=>x.id===t.dataset.previewVersion);modal("Version preview",`<p><b>${esc(v.summary)}</b></p><p>${fmtDate(v.createdAt)}</p><pre>${esc(JSON.stringify({participants:v.snapshot.players?.length,teams:v.snapshot.teams?.length,events:v.snapshot.events?.length,matches:v.snapshot.matches?.length,announcements:v.snapshot.announcements?.length,prizes:v.snapshot.prizes?.length},null,2))}</pre>`,[{label:"Close",cls:"secondary",run:closeModal}])}
+if(t.dataset.restoreVersion){if(!adminOnly())return;const v=state.versions.find(x=>x.id===t.dataset.restoreVersion);confirmAction("Restore saved version",[v.summary,fmtDate(v.createdAt)],async()=>{await api("/api/staff/action",{method:"POST",body:JSON.stringify({type:"restoreVersion",payload:{versionId:v.id}})});await loadState();toast("Version restored.")})}
+}catch(err){toast(err.message||"Something went wrong.")}
 });
-
-$("navlist").addEventListener("click",event => {
-  const button = event.target.closest("[data-page]");
-  if (button) showPage(button.dataset.page);
-});
-
-$("refreshButton").addEventListener("click",() => loadState().catch(e => alert(e.message)));
-
-$("logoutButton").addEventListener("click",async () => {
-  try { await api("/api/staff/logout",{method:"POST"}); } catch {}
-  location.reload();
-});
-
-$("addPlayerButton").addEventListener("click",async () => {
-  try {
-    await action("addPlayer",{
-      roblox:$("newRoblox").value,
-      discord:$("newDiscord").value,
-      previousClans:$("newClans").value
-    });
-    $("newRoblox").value = "";
-    $("newDiscord").value = "";
-    $("newClans").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("playerSearch").addEventListener("input",renderPlayers);
-
-$("playerRows").addEventListener("click",async event => {
-  const edit = event.target.closest("[data-edit-player]");
-  const del = event.target.closest("[data-delete-player]");
-
-  if (edit) {
-    const player = state.players.find(p => p.id === edit.dataset.editPlayer);
-    if (!player) return;
-    const roblox = prompt("Roblox username:",player.roblox);
-    if (roblox === null) return;
-    const discord = prompt("Discord username:",player.discord || "");
-    if (discord === null) return;
-    const status = prompt("Status (Registered, Active, Disqualified):",player.status);
-    if (status === null) return;
-    const points = prompt("Points:",player.points);
-    if (points === null) return;
-
-    try {
-      await action("updatePlayer",{id:player.id,roblox,discord,status,points:Number(points)});
-    } catch(e) { alert(e.message); }
-  }
-
-  if (del && confirm("Delete this player? Their team assignment will also be removed.")) {
-    try { await action("deletePlayer",{id:del.dataset.deletePlayer}); }
-    catch(e) { alert(e.message); }
-  }
-});
-
-$("generateTeamsButton").addEventListener("click",async () => {
-  if (!confirm("Generate or reroll teams? Existing team assignments will be replaced.")) return;
-  try { await action("generateTeams",{size:Number($("teamSize").value)}); }
-  catch(e) { alert(e.message); }
-});
-
-$("publishTeamsButton").addEventListener("click",async () => {
-  if (!confirm("Publish these teams to the public website?")) return;
-  try { await action("publishTeams"); }
-  catch(e) { alert(e.message); }
-});
-
-$("resetTeamsButton").addEventListener("click",async () => {
-  if (!confirm("Reset all teams and remove every team assignment?")) return;
-  try { await action("resetTeams"); }
-  catch(e) { alert(e.message); }
-});
-
-$("teamList").addEventListener("click",async event => {
-  const button = event.target.closest("[data-edit-team]");
-  if (!button) return;
-  const team = state.teams.find(t => t.id === button.dataset.editTeam);
-  if (!team) return;
-  const name = prompt("Team name:",team.name);
-  if (name === null) return;
-  const captain = prompt("Captain Roblox username:",team.captain || "");
-  if (captain === null) return;
-  try { await action("updateTeam",{id:team.id,name,captain}); }
-  catch(e) { alert(e.message); }
-});
-
-$("checkinButton").addEventListener("click",async () => {
-  try {
-    await action("checkin",{
-      playerId:$("checkinPlayer").value,
-      eventId:$("checkinEvent").value,
-      status:$("checkinStatus").value
-    });
-  } catch(e) { alert(e.message); }
-});
-
-$("addEventButton").addEventListener("click",async () => {
-  const local = $("eventStart").value;
-  try {
-    await action("addEvent",{
-      title:$("eventTitle").value,
-      description:$("eventDescription").value,
-      startAt:local ? new Date(local).toISOString() : null,
-      status:$("eventStatus").value,
-      published:$("eventPublished").checked
-    });
-    $("eventTitle").value = "";
-    $("eventDescription").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("eventList").addEventListener("click",async event => {
-  const toggle = event.target.closest("[data-toggle-event]");
-  const del = event.target.closest("[data-delete-event]");
-
-  if (toggle) {
-    const item = state.events.find(e => e.id === toggle.dataset.toggleEvent);
-    if (!item) return;
-    try { await action("updateEvent",{id:item.id,published:!item.published}); }
-    catch(e) { alert(e.message); }
-  }
-
-  if (del && confirm("Delete this event?")) {
-    try { await action("deleteEvent",{id:del.dataset.deleteEvent}); }
-    catch(e) { alert(e.message); }
-  }
-});
-
-$("addMatchButton").addEventListener("click",async () => {
-  const local = $("matchTime").value;
-  const teamIds = [...$("matchTeams").selectedOptions].map(o => o.value);
-  try {
-    await action("addMatch",{
-      title:$("matchTitle").value,
-      eventId:$("matchEvent").value,
-      teamIds,
-      scheduledAt:local ? new Date(local).toISOString() : null
-    });
-    $("matchTitle").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("matchList").addEventListener("click",async event => {
-  const button = event.target.closest("[data-complete-match]");
-  if (!button) return;
-  const matchId = button.dataset.completeMatch;
-  const winnerTeamId = $("winner-" + matchId).value;
-  if (!winnerTeamId) return alert("Choose a winning team.");
-  if (!confirm("Record this winner and award 10 points to every player on that team?")) return;
-  try { await action("completeMatch",{matchId,winnerTeamId,awardPoints:true}); }
-  catch(e) { alert(e.message); }
-});
-
-$("awardPointsButton").addEventListener("click",async () => {
-  try {
-    await action("awardPoints",{
-      playerId:$("pointsPlayer").value,
-      amount:Number($("pointsAmount").value)
-    });
-  } catch(e) { alert(e.message); }
-});
-
-$("addAchievementButton").addEventListener("click",async () => {
-  try {
-    await action("addAchievement",{
-      playerId:$("achievementPlayer").value,
-      achievement:$("achievementName").value
-    });
-    $("achievementName").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("addChallengeButton").addEventListener("click",async () => {
-  try {
-    await action("addChallenge",{
-      title:$("challengeTitle").value,
-      description:$("challengeDescription").value,
-      points:Number($("challengePoints").value),
-      achievement:$("challengeAchievement").value,
-      published:$("challengePublished").checked
-    });
-    $("challengeTitle").value = "";
-    $("challengeDescription").value = "";
-    $("challengeAchievement").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("completeChallengeButton").addEventListener("click",async () => {
-  try {
-    await action("completeChallenge",{
-      challengeId:$("completeChallengeSelect").value,
-      playerId:$("completeChallengePlayer").value
-    });
-  } catch(e) { alert(e.message); }
-});
-
-$("challengeList").addEventListener("click",async event => {
-  const button = event.target.closest("[data-delete-challenge]");
-  if (!button || !confirm("Delete this challenge?")) return;
-  try { await action("deleteChallenge",{challengeId:button.dataset.deleteChallenge}); }
-  catch(e) { alert(e.message); }
-});
-
-$("openMvpButton").addEventListener("click",async () => {
-  try { await action("toggleMvp",{open:true}); }
-  catch(e) { alert(e.message); }
-});
-
-$("closeMvpButton").addEventListener("click",async () => {
-  try { await action("toggleMvp",{open:false}); }
-  catch(e) { alert(e.message); }
-});
-
-$("resetMvpButton").addEventListener("click",async () => {
-  if (!confirm("Reset all MVP votes?")) return;
-  try { await action("resetVotes"); }
-  catch(e) { alert(e.message); }
-});
-
-$("addAnnouncementButton").addEventListener("click",async () => {
-  try {
-    await action("addAnnouncement",{
-      title:$("announcementTitle").value,
-      body:$("announcementBody").value,
-      published:$("announcementPublished").checked
-    });
-    $("announcementTitle").value = "";
-    $("announcementBody").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("announcementList").addEventListener("click",async event => {
-  const toggle = event.target.closest("[data-toggle-announcement]");
-  const del = event.target.closest("[data-delete-announcement]");
-
-  if (toggle) {
-    const item = state.announcements.find(a => a.id === toggle.dataset.toggleAnnouncement);
-    if (!item) return;
-    try { await action("updateAnnouncement",{id:item.id,published:!item.published}); }
-    catch(e) { alert(e.message); }
-  }
-
-  if (del && confirm("Delete this announcement?")) {
-    try { await action("deleteAnnouncement",{id:del.dataset.deleteAnnouncement}); }
-    catch(e) { alert(e.message); }
-  }
-});
-
-$("publishWinnerButton").addEventListener("click",async () => {
-  if (!confirm("Publish this team as the Nerolympics champion?")) return;
-  try {
-    await action("publishWinner",{
-      teamId:$("winnerTeam").value,
-      message:$("winnerMessage").value
-    });
-  } catch(e) { alert(e.message); }
-});
-
-$("clearWinnerButton").addEventListener("click",async () => {
-  if (!confirm("Remove the currently published winner?")) return;
-  try { await action("clearWinner"); }
-  catch(e) { alert(e.message); }
-});
-
-$("addPrizeButton").addEventListener("click",async () => {
-  try {
-    await action("addPrize",{
-      playerId:$("prizePlayer").value,
-      reward:$("prizeReward").value,
-      public:$("prizePublic").checked
-    });
-    $("prizeReward").value = "";
-  } catch(e) { alert(e.message); }
-});
-
-$("prizeList").addEventListener("click",async event => {
-  const button = event.target.closest("[data-toggle-prize]");
-  if (!button) return;
-  const prize = state.prizes.find(p => p.id === button.dataset.togglePrize);
-  if (!prize) return;
-  try { await action("updatePrize",{id:prize.id,delivered:!prize.delivered}); }
-  catch(e) { alert(e.message); }
-});
-
-$("exportButton").addEventListener("click",() => {
-  window.location.href = "/api/staff/backup";
-});
-
-$("importButton").addEventListener("click",async () => {
-  if (currentRole !== "admin") return alert("Only the administrator can restore backups.");
-
-  const file = $("backupFile").files[0];
-  if (!file) return alert("Choose a backup JSON file first.");
-
-  if (!confirm("This will replace ALL current event data. Export a backup of the current data first. Continue?")) return;
-
-  try {
-    const backup = JSON.parse(await file.text());
-    $("restoreStatus").textContent = "Validating and restoring backup...";
-
-    const result = await api("/api/staff/restore",{
-      method:"POST",
-      body:JSON.stringify(backup)
-    });
-
-    $("restoreStatus").textContent = "Backup restored successfully.";
-    await loadState();
-    toast("Event data restored.");
-  } catch(error) {
-    $("restoreStatus").textContent = "Restore failed: " + error.message;
-    alert(error.message);
-  }
-});
-
-checkSession().catch(error => console.error(error));
+$("playerFilter").oninput=()=>{document.querySelectorAll("#playerTable tbody tr").forEach(()=>{})};
+document.addEventListener("input",e=>{if(e.target.id==="playerFilter"){const q=e.target.value.toLowerCase();document.querySelectorAll("#page-players tbody tr").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none")}});
+$("modalClose").onclick=closeModal;
+$("refreshButton").onclick=()=>loadState().catch(e=>toast(e.message));
+$("logoutButton").onclick=async()=>{try{await api("/api/staff/logout",{method:"POST",body:"{}"});location.reload()}catch(e){toast(e.message)}};
+$("loginForm").onsubmit=async e=>{e.preventDefault();$("loginError").textContent="";try{const r=await api("/api/staff/login",{method:"POST",body:JSON.stringify({username:$("loginUsername").value,password:$("loginPassword").value})});role=r.role;$("loginScreen").classList.add("hidden");$("dashboard").classList.remove("hidden");await loadState()}catch(err){$("loginError").textContent=err.message}};
+(async()=>{try{const s=await api("/api/staff/me");if(s.authenticated){role=s.role;$("loginScreen").classList.add("hidden");$("dashboard").classList.remove("hidden");await loadState()}}catch(e){}})();
 </script>
 </body>
 </html>
