@@ -1,16 +1,15 @@
 {
   "name": "nerolympics",
   "version": "1.0.0",
-  "description": "The official Nerolympics event website",
+  "description": "Nerolympics event and competition management platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
   "dependencies": {
     "express": "^4.21.2",
-    "express-session": "^1.18.1"
+    "express-session": "^1.18.1",
+    "helmet": "^8.1.0",
+    "express-rate-limit": "^7.5.0"
   }
 }
