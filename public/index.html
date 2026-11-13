@@ -1,237 +1,396 @@
-
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#080711">
+<meta name="theme-color" content="#080b12">
 <title>The Nerolympics | Nerotopia's Ultimate Community Competition</title>
 <style>
-[hidden]{display:none!important}
-:root{color-scheme:dark;--bg:#080711;--panel:#211632;--line:#49336d;--muted:#a99bbd;--text:#f7f2ff;--purple:#8B5CF6;--light:#A78BFA}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:radial-gradient(ellipse at 50% -10%,#382052 0,#080711 58%);color:var(--text);font:15px/1.6 Inter,system-ui,Arial,sans-serif}
-.wrap{width:min(1120px,calc(100% - 36px));margin:auto}
-.topbar{height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff12}
-.brand{font-weight:900;letter-spacing:.16em}
-.brand small{display:block;font-size:9px;color:var(--muted);letter-spacing:.3em}
-.nav{display:flex;gap:22px}
-.nav a{color:#c8b9dc;text-decoration:none;font-size:13px}
-.nav a:hover{color:#fff}
-.hero{padding:95px 0 70px;text-align:center}
-.eyebrow{color:var(--light);letter-spacing:.3em;font-size:11px;font-weight:800}
-.hero h1{font-size:clamp(42px,8vw,82px);line-height:1.03;letter-spacing:-.06em;margin:20px 0 16px}
-.hero h1 span{display:block;color:var(--light);text-shadow:0 0 35px #9b6cff66}
-.sub{max-width:650px;margin:0 auto;color:#c0b4ce;font-size:16px}
-.countdown{display:flex;justify-content:center;gap:12px;margin:35px auto 18px;flex-wrap:wrap}
-.timebox{min-width:82px;padding:13px 15px;background:#211632;border:1px solid #49336d;border-radius:13px}
-.timebox strong{display:block;font-size:27px}
-.timebox small{color:var(--muted);font-size:9px;letter-spacing:.18em}
-.date-note{color:#b6a7c9;font-size:13px}
-.section{padding:45px 0;border-top:1px solid #ffffff12}
-.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:20px}
-.section-head h2{margin:0;font-size:25px;letter-spacing:-.03em}
-.section-head p{margin:0;color:var(--muted);font-size:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px}
-.card{background:linear-gradient(145deg,#211632,#100d1b);border:1px solid #49336d;border-radius:15px;padding:18px}
-.game-number{font-size:11px;color:var(--light);letter-spacing:.18em}
-.card h3{margin:8px 0 5px;font-size:17px}
-.card p{margin:0;color:var(--muted);font-size:13px}
-.list{display:grid;gap:10px}
-.listitem{padding:16px 18px;border:1px solid #49336d;border-radius:13px;background:#171126}
-.listitem h3{margin:0 0 5px;font-size:16px}
-.listitem p{margin:0;color:#c0b4ce;font-size:13px;white-space:pre-wrap}
-.meta{font-size:11px;color:#a99bbd;margin-top:8px}
-.tablewrap{overflow:auto;border:1px solid #49336d;border-radius:13px}
-table{width:100%;border-collapse:collapse;min-width:480px}
-th,td{text-align:left;padding:13px 15px;border-bottom:1px solid #38264f;font-size:13px}
-th{font-size:10px;letter-spacing:.15em;color:#b8a6d0;background:#211632}
-tr:last-child td{border:0}
-.rank{color:var(--light);font-weight:800}
-.team-card{min-height:130px}
-.team-card h3{font-size:20px}
-.tag{display:inline-block;border:1px solid #62458f;border-radius:99px;padding:3px 8px;font-size:10px;color:#d7c7f3}
-.winner{border:1px solid #7654b8;background:linear-gradient(140deg,#281a3c,#151020);border-radius:18px;padding:25px}
-.winner h3{font-size:27px;margin:5px 0}
-.winner .eyebrow{color:#c4a8ff}
-.mvp{border:1px solid #62458f;background:#1d1530;border-radius:15px;padding:20px}
-.reward-note{color:#c0b4ce;font-size:13px}
-.footer{padding:35px 0 50px;color:#9585aa;font-size:11px;text-align:center;border-top:1px solid #ffffff12}
-.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #49336d;border-radius:13px}
-.overlay{position:fixed;inset:0;background:#03020def;z-index:50;display:grid;place-items:center;padding:20px}
-.overlaybox{width:min(620px,100%);padding:38px 28px;text-align:center;border:1px solid #7654b8;border-radius:22px;background:radial-gradient(ellipse at top,#382052,#120d1c 70%);box-shadow:0 30px 100px #000b}
-.overlaybox .eyebrow{color:#c4a8ff}
-.overlaybox h2{font-size:clamp(30px,6vw,52px);margin:12px 0}
-.overlaybox p{color:#d1c6df;white-space:pre-wrap}
-.close{margin-top:15px;padding:11px 22px;border-radius:99px;background:#8B5CF6;color:#fff;border:0;font-weight:800;cursor:pointer}
-@media(max-width:700px){.nav{gap:10px;overflow:auto}.nav a{white-space:nowrap;font-size:11px}.topbar{height:62px}.hero{padding:65px 0 48px}.section{padding:34px 0}.section-head{align-items:start;flex-direction:column}}
+[hidden]{display:none!important}:root{color-scheme:dark;--bg:#080b12;--panel:#111a29;--line:#28384e;--muted:#95a5bc;--text:#f4f7fc;--ice:#a78bfa;--gold:#c4b5fd}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#291747 0,#080711 58%);color:var(--text);font:15px/1.6 Inter,system-ui,Arial,sans-serif}.wrap{width:min(1120px,calc(100% - 36px));margin:auto}.topbar{height:72px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff12}.brand{font-weight:900;letter-spacing:.16em}.brand small{display:block;font-size:9px;color:var(--muted);letter-spacing:.3em}.nav{display:flex;gap:22px}.nav a{color:#b9c8db;text-decoration:none;font-size:13px}.nav a:hover{color:#fff}.hero{padding:95px 0 70px;text-align:center}.eyebrow{color:#b69aff;letter-spacing:.3em;font-size:11px;font-weight:800}.hero h1{font-size:clamp(42px,8vw,82px);line-height:1.03;letter-spacing:-.06em;margin:20px 0 16px}.hero h1 span{display:block;color:var(--ice);text-shadow:0 0 35px #9b6cff55}.sub{max-width:650px;margin:0 auto;color:#aab8ca;font-size:16px}.countdown{display:flex;justify-content:center;gap:12px;margin:35px auto 18px;flex-wrap:wrap}.timebox{min-width:82px;padding:13px 15px;background:#171126;border:1px solid #49336d;border-radius:13px}.timebox strong{display:block;font-size:27px}.timebox small{color:var(--muted);font-size:9px;letter-spacing:.18em}.date-note{color:#9eb0c7;font-size:13px}.section{padding:45px 0;border-top:1px solid #ffffff12}.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:20px}.section-head h2{margin:0;font-size:25px;letter-spacing:-.03em}.section-head p{margin:0;color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px}.card{background:linear-gradient(145deg,#211632,#100d1b);border:1px solid #392653;border-radius:15px;padding:18px}.game-number{font-size:11px;color:#b69aff;letter-spacing:.18em}.card h3{margin:8px 0 5px;font-size:17px}.card p{margin:0;color:var(--muted);font-size:13px}.list{display:grid;gap:10px}.listitem{padding:16px 18px;border:1px solid #392653;border-radius:13px;background:#151020}.listitem h3{margin:0 0 5px;font-size:16px}.listitem p{margin:0;color:#a9b7c9;font-size:13px;white-space:pre-wrap}.meta{font-size:11px;color:#8194ad;margin-top:8px}.tablewrap{overflow:auto;border:1px solid #392653;border-radius:13px}table{width:100%;border-collapse:collapse;min-width:480px}th,td{text-align:left;padding:13px 15px;border-bottom:1px solid #263449;font-size:13px}th{font-size:10px;letter-spacing:.15em;color:#8fa2bb;background:#111b2a}tr:last-child td{border:0}.rank{color:var(--gold);font-weight:800}.team-card{min-height:130px}.team-card h3{font-size:20px}.tag{display:inline-block;border:1px solid #3a506b;border-radius:99px;padding:3px 8px;font-size:10px;color:#c7d9ee}.winner{border:1px solid #7654b8;background:linear-gradient(140deg,#281a3c,#151020);border-radius:18px;padding:25px}.winner h3{font-size:27px;margin:5px 0}.winner .eyebrow{color:var(--gold)}.mvp{border:1px solid #62458f;background:#1d1530;border-radius:15px;padding:20px}.reward-note{color:#aebbd0;font-size:13px}.footer{padding:35px 0 50px;color:#6f819a;font-size:11px;text-align:center;border-top:1px solid #ffffff12}.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed #35465c;border-radius:13px}.overlay{position:fixed;inset:0;background:#03060deF;z-index:50;display:grid;place-items:center;padding:20px}.overlaybox{width:min(620px,100%);padding:38px 28px;text-align:center;border:1px solid #7654b8;border-radius:22px;background:radial-gradient(ellipse at top,#382052,#120d1c 70%);box-shadow:0 30px 100px #000b}.overlaybox .eyebrow{color:var(--gold)}.overlaybox h2{font-size:clamp(30px,6vw,52px);margin:12px 0}.overlaybox p{color:#c5cbd4;white-space:pre-wrap}.close{margin-top:15px;padding:11px 22px;border-radius:99px;background:#9b6cff;color:#fff;border:0;font-weight:800}@media(max-width:700px){.nav{gap:10px;overflow:auto}.nav a{white-space:nowrap;font-size:11px}.topbar{height:62px}.hero{padding:65px 0 48px}.section{padding:34px 0}.section-head{align-items:start;flex-direction:column}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header class="topbar">
-  <div class="brand">NERO<span style="color:var(--light)">LYMPICS</span><small>NEROTOPIA COMMUNITY COMPETITION</small></div>
-  <nav class="nav">
-    <a href="#games">Games</a><a href="#schedule">Schedule</a><a href="#leaderboard">Leaderboard</a><a href="#teams">Teams</a>
-  </nav>
+<div class="brand">NERO<span style="color:var(--ice)">LYMPICS</span><small>NEROTOPIA COMMUNITY COMPETITION</small></div>
+<nav class="nav">
+<a href="#games">Games</a>
+<a href="#schedule">Schedule</a>
+<a href="#leaderboard">Leaderboard</a>
+<a href="#teams">Teams</a>
+</nav>
 </header>
+
 <main>
 <section class="hero">
-  <div class="eyebrow">NEROTOPIA'S ULTIMATE COMMUNITY COMPETITION</div>
-  <h1>THE <span>NEROLYMPICS</span></h1>
-  <p class="sub">A week of competition, teamwork, and community challenges. Teams are randomly assigned. To register, open the Nerotopia Discord and create a ticket in the event registration channel: <strong>&lt;#1528279864447336579&gt;</strong>.</p>
-  <div class="countdown" id="countdown">
-    <div class="timebox"><strong>--</strong><small>DAYS</small></div>
-    <div class="timebox"><strong>--</strong><small>HOURS</small></div>
-    <div class="timebox"><strong>--</strong><small>MINUTES</small></div>
-    <div class="timebox"><strong>--</strong><small>SECONDS</small></div>
-  </div>
-  <div class="date-note" id="eventDate">November 14, 2026 · 6:00 PM EST</div>
-  <div class="date-note" id="status" style="margin-top:8px">Loading event information...</div>
+<div class="eyebrow">NEROTOPIA'S ULTIMATE COMMUNITY COMPETITION</div>
+<h1>THE <span>NEROLYMPICS</span></h1>
+<p class="sub">A week of competition, teamwork, and community challenges. Teams are randomly assigned. To register, open the Nerotopia Discord and create a ticket in the event registration channel.</p>
+<div class="countdown" id="countdown">
+<div class="timebox"><strong>--</strong><small>DAYS</small></div>
+<div class="timebox"><strong>--</strong><small>HOURS</small></div>
+<div class="timebox"><strong>--</strong><small>MINUTES</small></div>
+<div class="timebox"><strong>--</strong><small>SECONDS</small></div>
+</div>
+<div class="date-note" id="eventDate">November 14, 2026 · 6:00 PM EST</div>
+<div class="date-note" id="status" style="margin-top:8px">Loading event information...</div>
 </section>
+
 <section class="section" id="games">
-  <div class="section-head"><div><p>THE COMPETITION</p><h2>Official Games</h2></div></div>
-  <div class="grid">
-    <article class="card"><span class="game-number">EVENT 01</span><h3>Last to Leave the Circle</h3><p>Stay in the circle and outlast the competition.</p></article>
-    <article class="card"><span class="game-number">EVENT 02</span><h3>Bingo</h3><p>Complete the challenge and get your board in order.</p></article>
-    <article class="card"><span class="game-number">EVENT 03</span><h3>Hide and Seek</h3><p>Find the hidden players or stay out of sight.</p></article>
-    <article class="card"><span class="game-number">EVENT 04</span><h3>Mystery Events</h3><p>Unexpected challenges revealed during the event.</p></article>
-    <article class="card"><span class="game-number">EVENT 05</span><h3>Basketball Legends</h3><p>Compete on the court and earn points for your team.</p></article>
-  </div>
+<div class="section-head">
+<div><p>THE COMPETITION</p><h2>Official Games</h2></div>
+</div>
+<div class="grid">
+<article class="card"><span class="game-number">EVENT 01</span><h3>Last to Leave the Circle</h3><p>Stay in the circle and outlast the competition.</p></article>
+<article class="card"><span class="game-number">EVENT 02</span><h3>Bingo</h3><p>Complete the challenge and get your board in order.</p></article>
+<article class="card"><span class="game-number">EVENT 03</span><h3>Hide and Seek</h3><p>Find the hidden players or stay out of sight.</p></article>
+<article class="card"><span class="game-number">EVENT 04</span><h3>Mystery Events</h3><p>Unexpected challenges revealed during the event.</p></article>
+<article class="card"><span class="game-number">EVENT 05</span><h3>Basketball Legends</h3><p>Compete on the court and earn points for your team.</p></article>
+</div>
 </section>
+
 <section class="section" id="schedule">
-  <div class="section-head"><div><p>WHAT'S HAPPENING</p><h2>Event Schedule</h2></div></div>
-  <div class="list" id="events"><div class="empty">Schedule will appear here when published.</div></div>
+<div class="section-head">
+<div><p>WHAT'S HAPPENING</p><h2>Event Schedule</h2></div>
+</div>
+<div class="list" id="events"><div class="empty">Schedule will appear here when published.</div></div>
 </section>
+
 <section class="section" id="leaderboard">
-  <div class="section-head"><div><p>THE RACE FOR FIRST</p><h2>Leaderboard</h2></div></div>
-  <div class="tablewrap"><table><thead><tr><th>RANK</th><th>PLAYER</th><th>TEAM</th><th>POINTS</th></tr></thead><tbody id="leaderboardRows"><tr><td colspan="4">No scores available yet.</td></tr></tbody></table></div>
+<div class="section-head">
+<div><p>THE RACE FOR FIRST</p><h2>Leaderboard</h2></div>
+</div>
+<div class="tablewrap">
+<table>
+<thead><tr><th>RANK</th><th>PLAYER</th><th>TEAM</th><th>POINTS</th></tr></thead>
+<tbody id="leaderboardRows"><tr><td colspan="4">No scores available yet.</td></tr></tbody>
+</table>
+</div>
 </section>
+
 <section class="section" id="teams">
-  <div class="section-head"><div><p>RANDOMLY ASSIGNED</p><h2>Teams</h2></div></div>
-  <div class="grid" id="teamCards"><div class="empty">Teams have not been published yet.</div></div>
+<div class="section-head">
+<div><p>RANDOMLY ASSIGNED</p><h2>Teams</h2></div>
+</div>
+<div class="grid" id="teamCards"><div class="empty">Teams have not been published yet.</div></div>
 </section>
+
 <section class="section" id="announcements">
-  <div class="section-head"><div><p>OFFICIAL UPDATES</p><h2>Announcements</h2></div></div>
-  <div class="list" id="announcementList"><div class="empty">No announcements published yet.</div></div>
+<div class="section-head">
+<div><p>OFFICIAL UPDATES</p><h2>Announcements</h2></div>
+</div>
+<div class="list" id="announcementList"><div class="empty">No announcements published yet.</div></div>
 </section>
+
 <section class="section" id="mvp" hidden>
-  <div class="section-head"><div><p>RECOGNITION</p><h2>Most Valuable Player</h2></div></div>
-  <div class="mvp" id="mvpCard"></div>
+<div class="section-head">
+<div><p>RECOGNITION</p><h2>Most Valuable Player</h2></div>
+</div>
+<div class="mvp" id="mvpCard"></div>
 </section>
+
 <section class="section" id="rewards">
-  <div class="section-head"><div><p>WHAT'S AT STAKE</p><h2>Potential Rewards</h2></div></div>
-  <div class="card"><h3>Compete for rewards</h3><p class="reward-note">Potential rewards may include Customs, Custom Records, Mythics, Legendaries, and more. Rewards are subject to availability and are not guaranteed.</p><div id="prizeList" class="list" style="margin-top:12px"></div></div>
+<div class="section-head">
+<div><p>WHAT'S AT STAKE</p><h2>Potential Rewards</h2></div>
+</div>
+<div class="card">
+<h3>Compete for rewards</h3>
+<p class="reward-note">Potential rewards may include Customs, Custom Records, Mythics, Legendaries, and more. Rewards are subject to availability and are not guaranteed.</p>
+<div id="prizeList" class="list" style="margin-top:12px"></div>
+</div>
 </section>
+
 <section class="section" id="winnerSection" hidden>
-  <div class="winner"><div class="eyebrow">NEROLYMPICS CHAMPIONS</div><h3 id="winnerName">Winning Team</h3><p id="winnerMessage"></p></div>
+<div class="winner">
+<div class="eyebrow">NEROLYMPICS CHAMPIONS</div>
+<h3 id="winnerName">Winning Team</h3>
+<p id="winnerMessage"></p>
+</div>
 </section>
+
 <section class="section" id="hall">
-  <div class="section-head"><div><p>EVENT LEGACY</p><h2>Hall of Fame</h2></div></div>
-  <div class="grid" id="hallCards"><div class="empty">Hall of Fame entries will appear here.</div></div>
+<div class="section-head">
+<div><p>EVENT LEGACY</p><h2>Hall of Fame</h2></div>
+</div>
+<div class="grid" id="hallCards"><div class="empty">Hall of Fame entries will appear here.</div></div>
 </section>
 </main>
+
 <footer class="footer">THE NEROLYMPICS · NEROTOPIA<br>All event times are displayed in your local timezone.</footer>
 </div>
+
 <div class="overlay" id="winnerOverlay" hidden>
-  <div class="overlaybox">
-    <div class="eyebrow">THE NEROLYMPICS · CHAMPIONS</div>
-    <h2 id="overlayTeam">Victory</h2>
-    <p id="overlayMessage"></p>
-    <button class="close" id="closeWinner">Continue to website</button>
-  </div>
+<div class="overlaybox">
+<div class="eyebrow">THE NEROLYMPICS · CHAMPIONS</div>
+<h2 id="overlayTeam">Victory</h2>
+<p id="overlayMessage"></p>
+<button class="close" id="closeWinner">Continue to website</button>
 </div>
+</div>
+
 <script>
-const START=new Date('2026-11-14T23:00:00.000Z');
-const $=id=>document.getElementById(id);
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const date=v=>{if(!v)return 'Time to be announced';const d=new Date(v);return Number.isNaN(d.getTime())?'Time to be announced':d.toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});};
-function countdown(){
-  let ms=START-Date.now();
-  if(ms<=0){$('countdown').innerHTML='<div class="timebox"><strong>LIVE</strong><small>THE EVENT</small></div>';$('status').textContent='The Nerolympics have started. Good luck to every team!';return;}
-  const units=[Math.floor(ms/86400000),Math.floor(ms/3600000)%24,Math.floor(ms/60000)%60,Math.floor(ms/1000)%60];
-  const names=['DAYS','HOURS','MINUTES','SECONDS'];
-  $('countdown').innerHTML=units.map((v,i)=>`<div class="timebox"><strong>${String(v).padStart(2,'0')}</strong><small>${names[i]}</small></div>`).join('');
-  $('status').textContent='Countdown to the opening event';
+const START = new Date('2026-11-14T23:00:00.000Z');
+const $ = id => document.getElementById(id);
+
+const esc = value =>
+  String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[character]));
+
+const date = value => {
+  if (!value) return 'Time to be announced';
+
+  const d = new Date(value);
+
+  return Number.isNaN(d.getTime())
+    ? 'Time to be announced'
+    : d.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+};
+
+function countdown() {
+  let ms = START - Date.now();
+
+  if (ms <= 0) {
+    $('countdown').innerHTML =
+      '<div class="timebox"><strong>LIVE</strong><small>THE EVENT</small></div>';
+
+    $('status').textContent =
+      'The Nerolympics have started. Good luck to every team!';
+
+    return;
+  }
+
+  const units = [
+    Math.floor(ms / 86400000),
+    Math.floor(ms / 3600000) % 24,
+    Math.floor(ms / 60000) % 60,
+    Math.floor(ms / 1000) % 60
+  ];
+
+  const names = ['DAYS', 'HOURS', 'MINUTES', 'SECONDS'];
+
+  $('countdown').innerHTML = units
+    .map((value, index) =>
+      `<div class="timebox"><strong>${String(value).padStart(2, '0')}</strong><small>${names[index]}</small></div>`
+    )
+    .join('');
+
+  $('status').textContent = 'Countdown to the opening event';
 }
-function empty(host,msg){host.innerHTML=`<div class="empty">${esc(msg)}</div>`;}
-function renderEvents(events){
-  const host=$('events');
-  if(!events.length)return empty(host,'Schedule will appear here when published.');
-  host.innerHTML=events.slice().sort((a,b)=>new Date(a.startAt||0)-new Date(b.startAt||0)).map(e=>`<article class="listitem"><h3>${esc(e.title)}</h3><p>${esc(e.description||'')}</p><div class="meta">${date(e.startAt)} · ${esc(e.status||'Upcoming')}</div></article>`).join('');
+
+function empty(host, message) {
+  host.innerHTML = `<div class="empty">${esc(message)}</div>`;
 }
-function renderLeaderboard(players,teams){
-  const host=$('leaderboardRows');
-  const rows=players.slice().sort((a,b)=>Number(b.points||0)-Number(a.points||0));
-  if(!rows.length){host.innerHTML='<tr><td colspan="4">No scores available yet.</td></tr>';return;}
-  host.innerHTML=rows.map((p,i)=>`<tr><td class="rank">${i+1}</td><td><b>${esc(p.roblox)}</b></td><td>${esc(teams.find(t=>t.id===p.teamId)?.name||'—')}</td><td>${Number(p.points||0).toLocaleString()}</td></tr>`).join('');
+
+function renderEvents(events) {
+  const host = $('events');
+
+  if (!events.length) {
+    return empty(host, 'Schedule will appear here when published.');
+  }
+
+  host.innerHTML = events
+    .slice()
+    .sort((a, b) => new Date(a.startAt || 0) - new Date(b.startAt || 0))
+    .map(event => `
+      <article class="listitem">
+        <h3>${esc(event.title)}</h3>
+        <p>${esc(event.description || '')}</p>
+        <div class="meta">${date(event.startAt)} · ${esc(event.status || 'Upcoming')}</div>
+      </article>
+    `)
+    .join('');
 }
-function renderTeams(teams,players){
-  const host=$('teamCards');
-  if(!teams.length)return empty(host,'Teams have not been published yet.');
-  host.innerHTML=teams.map(t=>`<article class="card team-card"><span class="tag">${(t.memberIds||[]).length} MEMBERS</span><h3>${esc(t.name)}</h3><p>${(t.memberIds||[]).map(id=>esc(players.find(p=>p.id===id)?.roblox||'Participant')).join(' · ')}</p><div class="meta">${Number(t.points||0)} points · ${Number(t.wins||0)} wins</div></article>`).join('');
+
+function renderLeaderboard(players, teams) {
+  const host = $('leaderboardRows');
+
+  const rows = players
+    .slice()
+    .sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
+
+  if (!rows.length) {
+    host.innerHTML =
+      '<tr><td colspan="4">No scores available yet.</td></tr>';
+
+    return;
+  }
+
+  host.innerHTML = rows.map((player, index) => `
+    <tr>
+      <td class="rank">${index + 1}</td>
+      <td><b>${esc(player.roblox)}</b></td>
+      <td>${esc(teams.find(team => team.id === player.teamId)?.name || '—')}</td>
+      <td>${Number(player.points || 0).toLocaleString()}</td>
+    </tr>
+  `).join('');
 }
-function renderAnnouncements(items){
-  if(!items.length)return empty($('announcementList'),'No announcements published yet.');
-  $('announcementList').innerHTML=items.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(a=>`<article class="listitem"><h3>${esc(a.title)}</h3><p>${esc(a.body)}</p><div class="meta">${date(a.createdAt)}</div></article>`).join('');
+
+function renderTeams(teams, players) {
+  const host = $('teamCards');
+
+  if (!teams.length) {
+    return empty(host, 'Teams have not been published yet.');
+  }
+
+  host.innerHTML = teams.map(team => `
+    <article class="card team-card">
+      <span class="tag">${(team.memberIds || []).length} MEMBERS</span>
+      <h3>${esc(team.name)}</h3>
+      <p>${(team.memberIds || [])
+        .map(playerId =>
+          esc(players.find(player => player.id === playerId)?.roblox || 'Participant')
+        )
+        .join(' · ')}</p>
+      <div class="meta">${Number(team.points || 0)} points · ${Number(team.wins || 0)} wins</div>
+    </article>
+  `).join('');
 }
-function renderWinner(winner){
-  if(!winner)return;
-  $('winnerSection').hidden=false;
-  $('winnerName').textContent=winner.teamName;
-  $('winnerMessage').textContent=winner.message||'';
-  const key='nerolympics-dismissed-winner';
-  let dismissed='';
-  try{dismissed=localStorage.getItem(key)||'';}catch{}
-  if(dismissed!==winner.id){
-    $('overlayTeam').textContent=winner.teamName;
-    $('overlayMessage').textContent=winner.message||'Congratulations to the champions!';
-    $('winnerOverlay').hidden=false;
-    $('closeWinner').onclick=()=>{
-      try{localStorage.setItem(key,winner.id);}catch{}
-      $('winnerOverlay').hidden=true;
+
+function renderAnnouncements(items) {
+  if (!items.length) {
+    return empty(
+      $('announcementList'),
+      'No announcements published yet.'
+    );
+  }
+
+  $('announcementList').innerHTML = items
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map(item => `
+      <article class="listitem">
+        <h3>${esc(item.title)}</h3>
+        <p>${esc(item.body)}</p>
+        <div class="meta">${date(item.createdAt)}</div>
+      </article>
+    `)
+    .join('');
+}
+
+function renderWinner(winner) {
+  if (!winner) return;
+
+  $('winnerSection').hidden = false;
+  $('winnerName').textContent = winner.teamName;
+  $('winnerMessage').textContent = winner.message || '';
+
+  const key = 'nerolympics-dismissed-winner';
+
+  let dismissed = '';
+
+  try {
+    dismissed = localStorage.getItem(key) || '';
+  } catch {}
+
+  if (dismissed !== winner.id) {
+    $('overlayTeam').textContent = winner.teamName;
+    $('overlayMessage').textContent =
+      winner.message || 'Congratulations to the champions!';
+
+    $('winnerOverlay').hidden = false;
+
+    $('closeWinner').onclick = () => {
+      try {
+        localStorage.setItem(key, winner.id);
+      } catch {}
+
+      $('winnerOverlay').hidden = true;
     };
   }
 }
-function renderMvp(mvp){
-  if(!mvp)return;
-  $('mvp').hidden=false;
-  $('mvpCard').innerHTML=`<h3>${esc(mvp.player.roblox)}</h3><p>${esc(mvp.message||'Recognized for an outstanding performance.')}</p>`;
+
+function renderMvp(mvp) {
+  if (!mvp) return;
+
+  $('mvp').hidden = false;
+
+  $('mvpCard').innerHTML = `
+    <h3>${esc(mvp.player.roblox)}</h3>
+    <p>${esc(mvp.message || 'Recognized for an outstanding performance.')}</p>
+  `;
 }
-function renderPrizes(items){
-  if(!items?.length)return;
-  $('prizeList').innerHTML=items.map(p=>`<div class="listitem"><b>${esc(p.playerName)}</b><p>${esc(p.reward)}</p></div>`).join('');
+
+function renderPrizes(items) {
+  if (!items?.length) return;
+
+  $('prizeList').innerHTML = items.map(prize => `
+    <div class="listitem">
+      <b>${esc(prize.playerName)}</b>
+      <p>${esc(prize.reward)}</p>
+    </div>
+  `).join('');
 }
-function renderHistory(history,hall){
-  const entries=hall?.length?hall:history||[];
-  if(!entries.length)return empty($('hallCards'),'Hall of Fame entries will appear here.');
-  $('hallCards').innerHTML=entries.slice(0,12).map(h=>`<article class="card"><span class="game-number">CHAMPIONS</span><h3>${esc(h.teamName||'Nerolympics Winner')}</h3><p>${esc(h.message||'')}</p><div class="meta">${date(h.publishedAt)}</div></article>`).join('');
+
+function renderHistory(history, hall) {
+  const entries = hall?.length ? hall : history || [];
+
+  if (!entries.length) {
+    return empty(
+      $('hallCards'),
+      'Hall of Fame entries will appear here.'
+    );
+  }
+
+  $('hallCards').innerHTML = entries.slice(0, 12).map(entry => `
+    <article class="card">
+      <span class="game-number">CHAMPIONS</span>
+      <h3>${esc(entry.teamName || 'Nerolympics Winner')}</h3>
+      <p>${esc(entry.message || '')}</p>
+      <div class="meta">${date(entry.publishedAt)}</div>
+    </article>
+  `).join('');
 }
-async function loadSite(){
-  try{
-    const response=await fetch('/api/public/state',{cache:'no-store'});
-    const data=await response.json();
-    if(response.status===503&&data.maintenance){$('status').textContent=data.message||'Website maintenance in progress.';return;}
-    if(!response.ok)throw new Error(data.error||'Unable to load event data.');
-    $('status').textContent='Event information is up to date.';
-    renderEvents(data.events||[]);
-    renderLeaderboard(data.players||[],data.teams||[]);
-    renderTeams(data.teams||[],data.players||[]);
-    renderAnnouncements(data.announcements||[]);
+
+async function loadSite() {
+  try {
+    const response = await fetch('/api/public/state', {
+      cache: 'no-store'
+    });
+
+    const data = await response.json();
+
+    if (response.status === 503 && data.maintenance) {
+      $('status').textContent =
+        data.message || 'Website maintenance in progress.';
+
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to load event data.');
+    }
+
+    $('status').textContent = 'Event information is up to date.';
+
+    renderEvents(data.events || []);
+    renderLeaderboard(data.players || [], data.teams || []);
+    renderTeams(data.teams || [], data.players || []);
+    renderAnnouncements(data.announcements || []);
     renderWinner(data.winner);
     renderMvp(data.mvp);
-    renderPrizes(data.prizes||[]);
-    renderHistory(data.history||[],data.hallOfFame||[]);
-  }catch(e){
-    $('status').textContent='Event data is temporarily unavailable. Please refresh in a moment.';
-    console.error(e);
+    renderPrizes(data.prizes || []);
+    renderHistory(data.history || [], data.hallOfFame || []);
+  } catch (error) {
+    $('status').textContent =
+      'Event data is temporarily unavailable. Please refresh in a moment.';
+
+    console.error(error);
   }
 }
+
 countdown();
-setInterval(countdown,1000);
+setInterval(countdown, 1000);
+
 loadSite();
-setInterval(loadSite,30000);
+setInterval(loadSite, 30000);
 </script>
 </body>
 </html>
