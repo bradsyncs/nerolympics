@@ -3,99 +3,102 @@ const express = require("express");
 const session = require("express-session");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 app.set("trust proxy", 1);
 
 const PORT = process.env.PORT || 3000;
-const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, "data", "nerolympics.json");
+const DATA_FILE = process.env.DATA_FILE ||
+  path.join(__dirname, "data", "nerolympics.json");
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
   name: "nerolympics.sid",
-  secret: process.env.SESSION_SECRET || "change-this-before-deploying",
+  secret: process.env.SESSION_SECRET || "replace-this-secret-before-deployment",
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 1000 * 60 * 60 * 12
+    maxAge: 12 * 60 * 60 * 1000
   }
 }));
 
-const emptyState = () => ({
-  players: [],
-  teams: [],
-  events: [],
-  matches: [],
-  challenges: [],
-  announcements: [],
-  prizes: [],
-  history: [],
-  hallOfFame: [],
-  settings: {
-    teamsPublished: false,
-    teamSize: 4,
-    mvpOpen: false
-  },
-  winner: null,
-  mvpVotes: {}
-});
+function createEmptyState() {
+  return {
+    players: [],
+    teams: [],
+    events: [],
+    matches: [],
+    challenges: [],
+    announcements: [],
+    prizes: [],
+    history: [],
+    hallOfFame: [],
+    settings: {
+      teamsPublished: false,
+      teamSize: 4,
+      mvpOpen: false
+    },
+    winner: null,
+    mvpVotes: {}
+  };
+}
 
 function ensureDataFile() {
-  const folder = path.dirname(DATA_FILE);
-  fs.mkdirSync(folder, { recursive: true });
+  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
 
   if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(emptyState(), null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify(createEmptyState(), null, 2));
   }
 }
 
 function loadState() {
   ensureDataFile();
 
-  try {
-    const saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    const defaults = emptyState();
+  const saved = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+  const defaults = createEmptyState();
 
-    return {
-      ...defaults,
-      ...saved,
-      settings: { ...defaults.settings, ...(saved.settings || {}) },
-      players: Array.isArray(saved.players) ? saved.players : [],
-      teams: Array.isArray(saved.teams) ? saved.teams : [],
-      events: Array.isArray(saved.events) ? saved.events : [],
-      matches: Array.isArray(saved.matches) ? saved.matches : [],
-      challenges: Array.isArray(saved.challenges) ? saved.challenges : [],
-      announcements: Array.isArray(saved.announcements) ? saved.announcements : [],
-      prizes: Array.isArray(saved.prizes) ? saved.prizes : [],
-      history: Array.isArray(saved.history) ? saved.history : [],
-      hallOfFame: Array.isArray(saved.hallOfFame) ? saved.hallOfFame : [],
-      mvpVotes: saved.mvpVotes || {}
-    };
-  } catch (error) {
-    console.error("Could not read event data:", error);
-    throw new Error("The event data file could not be read.");
-  }
+  return {
+    ...defaults,
+    ...saved,
+    settings: { ...defaults.settings, ...(saved.settings || {}) },
+    players: Array.isArray(saved.players) ? saved.players : [],
+    teams: Array.isArray(saved.teams) ? saved.teams : [],
+    events: Array.isArray(saved.events) ? saved.events : [],
+    matches: Array.isArray(saved.matches) ? saved.matches : [],
+    challenges: Array.isArray(saved.challenges) ? saved.challenges : [],
+    announcements: Array.isArray(saved.announcements) ? saved.announcements : [],
+    prizes: Array.isArray(saved.prizes) ? saved.prizes : [],
+    history: Array.isArray(saved.history) ? saved.history : [],
+    hallOfFame: Array.isArray(saved.hallOfFame) ? saved.hallOfFame : [],
+    mvpVotes: saved.mvpVotes || {}
+  };
 }
 
 let state = loadState();
 
 function saveState() {
-  const temporary = DATA_FILE + ".tmp";
-  fs.writeFileSync(temporary, JSON.stringify(state, null, 2));
-  fs.renameSync(temporary, DATA_FILE);
+  const tempFile = DATA_FILE + ".tmp";
+  fs.writeFileSync(tempFile, JSON.stringify(state, null, 2));
+  fs.renameSync(tempFile, DATA_FILE);
 }
 
-function id() {
-  return require("crypto").randomUUID();
+function makeId() {
+  return crypto.randomUUID();
 }
 
-function clean(value) {
-  return String(value ?? "").trim().slice(0, 500);
+function text(value, max = 500) {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function number(value, fallback = 0) {
+  const result = Number(value);
+  return Number.isFinite(result) ? result : fallback;
 }
 
 function staffRequired(req, res, next) {
@@ -105,34 +108,67 @@ function staffRequired(req, res, next) {
   next();
 }
 
+function adminRequired(req, res, next) {
+  if (!req.session.staff || req.session.staff.role !== "admin") {
+    return res.status(403).json({ error: "Administrator access required." });
+  }
+  next();
+}
+
+function findPlayer(playerId) {
+  return state.players.find(p => p.id === playerId);
+}
+
+function findTeam(teamId) {
+  return state.teams.find(t => t.id === teamId);
+}
+
 function publicState() {
   return {
     players: state.players.map(p => ({
       id: p.id,
       roblox: p.roblox,
-      discord: p.discord,
       status: p.status,
       points: p.points || 0,
       teamId: p.teamId || null,
       achievements: p.achievements || []
     })),
-    teams: state.settings.teamsPublished ? state.teams : [],
+
+    teams: state.settings.teamsPublished
+      ? state.teams.map(t => ({
+          id: t.id,
+          name: t.name,
+          captain: t.captain || "",
+          memberIds: t.memberIds || [],
+          wins: t.wins || 0,
+          points: t.points || 0
+        }))
+      : [],
+
     events: state.events.filter(e => e.published !== false),
+
     matches: state.matches.filter(m => m.published !== false),
+
     challenges: state.challenges.filter(c => c.published),
+
     announcements: state.announcements.filter(a => a.published),
+
     settings: {
       teamsPublished: state.settings.teamsPublished,
-      mvpOpen: state.settings.mvpOpen
+      mvpOpen: !!state.settings.mvpOpen
     },
+
     winner: state.winner,
     history: state.history,
     hallOfFame: state.hallOfFame,
+
     mvp: {
       open: !!state.settings.mvpOpen
     }
   };
 }
+
+/* WEBSITE FILES */
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -147,6 +183,7 @@ app.get("/staff", (req, res) => {
 /* PUBLIC API */
 
 app.get("/api/public/state", (req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json(publicState());
 });
 
@@ -155,54 +192,71 @@ app.post("/api/mvp/vote", (req, res) => {
     return res.status(403).json({ error: "MVP voting is closed." });
   }
 
-  const playerId = clean(req.body.playerId);
-  const player = state.players.find(p => p.id === playerId);
+  if (req.session.mvpVoted) {
+    return res.status(409).json({
+      error: "A vote has already been submitted from this browser session."
+    });
+  }
+
+  const playerId = text(req.body.playerId);
+  const player = findPlayer(playerId);
 
   if (!player) {
     return res.status(404).json({ error: "Player not found." });
   }
 
-  // One vote per browser session.
-  if (req.session.mvpVoted) {
-    return res.status(409).json({ error: "A vote has already been submitted from this session." });
-  }
-
   state.mvpVotes[playerId] = (state.mvpVotes[playerId] || 0) + 1;
   req.session.mvpVoted = true;
-  saveState();
 
+  saveState();
   res.json({ success: true });
 });
 
-/* STAFF AUTHENTICATION */
+/* STAFF LOGIN */
 
-app.post("/api/staff/login", (req, res) => {
-  const username = clean(req.body.username);
+app.post("/api/staff/login", (req, res, next) => {
+  const username = text(req.body.username, 100);
   const password = String(req.body.password || "");
 
-  const adminMatch =
+  const adminConfigured =
+    !!process.env.ADMIN_USERNAME && !!process.env.ADMIN_PASSWORD;
+
+  const staffConfigured =
+    !!process.env.STAFF_USERNAME && !!process.env.STAFF_PASSWORD;
+
+  if (!adminConfigured && !staffConfigured) {
+    return res.status(500).json({
+      error: "Configure staff credentials in Render environment variables."
+    });
+  }
+
+  const isAdmin = adminConfigured &&
     username === process.env.ADMIN_USERNAME &&
     password === process.env.ADMIN_PASSWORD;
 
-  const staffMatch =
+  const isStaff = staffConfigured &&
     username === process.env.STAFF_USERNAME &&
     password === process.env.STAFF_PASSWORD;
 
-  if ((!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) &&
-      (!process.env.STAFF_USERNAME || !process.env.STAFF_PASSWORD)) {
-    return res.status(500).json({ error: "Staff credentials have not been configured." });
+  if (!isAdmin && !isStaff) {
+    return res.status(401).json({
+      error: "Incorrect username or password."
+    });
   }
 
-  if (!adminMatch && !staffMatch) {
-    return res.status(401).json({ error: "Incorrect username or password." });
-  }
+  req.session.regenerate(err => {
+    if (err) return next(err);
 
-  req.session.staff = {
-    username,
-    role: adminMatch ? "admin" : "staff"
-  };
+    req.session.staff = {
+      username,
+      role: isAdmin ? "admin" : "staff"
+    };
 
-  res.json({ success: true, role: req.session.staff.role });
+    req.session.save(err => {
+      if (err) return next(err);
+      res.json({ success: true, role: req.session.staff.role });
+    });
+  });
 });
 
 app.post("/api/staff/logout", (req, res) => {
@@ -212,88 +266,118 @@ app.post("/api/staff/logout", (req, res) => {
   });
 });
 
-app.get("/api/staff/me", staffRequired, (req, res) => {
-  res.json({ staff: req.session.staff });
+app.get("/api/staff/me", (req, res) => {
+  if (!req.session.staff) {
+    return res.status(401).json({ authenticated: false });
+  }
+
+  res.json({
+    authenticated: true,
+    role: req.session.staff.role,
+    username: req.session.staff.username
+  });
 });
 
 app.get("/api/staff/state", staffRequired, (req, res) => {
+  res.set("Cache-Control", "no-store");
   res.json(state);
 });
 
 /* STAFF ACTIONS */
 
 app.post("/api/staff/action", staffRequired, (req, res) => {
-  const { type, payload = {} } = req.body || {};
+  const type = text(req.body.type, 100);
+  const payload = req.body.payload || {};
 
   try {
-    let result = { success: true };
-
     switch (type) {
 
       case "addPlayer": {
-        const roblox = clean(payload.roblox);
-        const discord = clean(payload.discord);
+        const roblox = text(payload.roblox, 100);
+        const discord = text(payload.discord, 100);
 
         if (!roblox || !discord) {
           throw new Error("Roblox and Discord usernames are required.");
         }
 
-        const player = {
-          id: id(),
+        if (state.players.some(p =>
+          p.roblox.toLowerCase() === roblox.toLowerCase()
+        )) {
+          throw new Error("That Roblox username is already registered.");
+        }
+
+        state.players.push({
+          id: makeId(),
           roblox,
           discord,
-          previousClans: clean(payload.previousClans),
+          previousClans: text(payload.previousClans),
           status: "Registered",
           points: 0,
           teamId: null,
           registeredAt: new Date().toISOString(),
           checkIns: {},
           achievements: []
-        };
-
-        state.players.push(player);
-        result.player = player;
+        });
         break;
       }
 
       case "updatePlayer": {
-        const player = state.players.find(p => p.id === payload.id);
-        if (!player) throw new Error("Player not found.");
+        const player = findPlayer(payload.id);
+        if (!player) throw new Error("Participant not found.");
 
-        Object.assign(player, {
-          roblox: clean(payload.roblox ?? player.roblox),
-          discord: clean(payload.discord ?? player.discord),
-          status: clean(payload.status ?? player.status),
-          points: Number(payload.points ?? player.points) || 0
-        });
+        if (payload.roblox !== undefined) {
+          player.roblox = text(payload.roblox, 100);
+        }
+        if (payload.discord !== undefined) {
+          player.discord = text(payload.discord, 100);
+        }
+        if (payload.status !== undefined) {
+          player.status = text(payload.status, 50);
+        }
+        if (payload.points !== undefined) {
+          player.points = number(payload.points, player.points || 0);
+        }
         break;
       }
 
       case "deletePlayer": {
         state.players = state.players.filter(p => p.id !== payload.id);
-        state.teams.forEach(t => {
-          t.memberIds = (t.memberIds || []).filter(id => id !== payload.id);
+
+        state.teams.forEach(team => {
+          team.memberIds = (team.memberIds || []).filter(id => id !== payload.id);
         });
+
+        delete state.mvpVotes[payload.id];
         break;
       }
 
       case "generateTeams": {
         if (state.settings.teamsPublished) {
-          throw new Error("Published teams cannot be rerolled. Reset teams first.");
+          throw new Error("Published teams cannot be rerolled.");
         }
 
-        const size = Math.max(1, Math.min(100, Number(payload.teamSize || state.settings.teamSize || 4)));
-        const eligible = state.players.filter(p => p.status !== "Removed");
+        const size = Math.max(2, Math.min(50,
+          number(payload.size ?? payload.teamSize, state.settings.teamSize || 4)
+        ));
 
-        if (!eligible.length) throw new Error("There are no registered players.");
+        const players = state.players.filter(p => p.status !== "Disqualified");
 
-        const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+        if (!players.length) throw new Error("There are no eligible participants.");
+
+        // Fisher-Yates shuffle.
+        const shuffled = [...players];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
         state.teams = [];
+        state.players.forEach(p => { p.teamId = null; });
 
         for (let i = 0; i < shuffled.length; i += size) {
           const members = shuffled.slice(i, i + size);
           const team = {
-            id: id(),
+            id: makeId(),
             name: `Team ${state.teams.length + 1}`,
             captain: "",
             memberIds: members.map(p => p.id),
@@ -302,7 +386,7 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
           };
 
           state.teams.push(team);
-          members.forEach(p => p.teamId = team.id);
+          members.forEach(p => { p.teamId = team.id; });
         }
 
         state.settings.teamSize = size;
@@ -311,61 +395,75 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       }
 
       case "publishTeams": {
-        if (!state.teams.length) throw new Error("Generate teams before publishing.");
+        if (!state.teams.length) throw new Error("Generate teams first.");
         state.settings.teamsPublished = true;
         break;
       }
 
       case "resetTeams": {
-        state.settings.teamsPublished = false;
+        if (state.settings.teamsPublished) {
+          throw new Error("Published teams cannot be reset.");
+        }
+
         state.teams = [];
-        state.players.forEach(p => p.teamId = null);
+        state.players.forEach(p => { p.teamId = null; });
         break;
       }
 
       case "updateTeam": {
-        const team = state.teams.find(t => t.id === payload.id);
-        if (!team) throw new Error("Team not found.");
-
         if (state.settings.teamsPublished) {
-          throw new Error("Unpublish or reset teams before editing them.");
+          throw new Error("Published teams cannot be edited.");
         }
 
-        if (payload.name !== undefined) team.name = clean(payload.name);
-        if (payload.captain !== undefined) team.captain = clean(payload.captain);
+        const team = findTeam(payload.id);
+        if (!team) throw new Error("Team not found.");
+
+        if (payload.name !== undefined) team.name = text(payload.name, 100);
+        if (payload.captain !== undefined) team.captain = text(payload.captain, 100);
         break;
       }
 
       case "checkin": {
-        const player = state.players.find(p => p.id === payload.playerId);
-        if (!player) throw new Error("Player not found.");
+        const player = findPlayer(payload.playerId);
+        if (!player) throw new Error("Participant not found.");
+
+        const eventId = text(payload.eventId);
+        const status = text(payload.status || "Present");
+
+        if (!eventId) throw new Error("Select an event.");
+        if (!["Present", "Absent", "Late"].includes(status)) {
+          throw new Error("Invalid check-in status.");
+        }
 
         player.checkIns = player.checkIns || {};
-        player.checkIns[clean(payload.eventId || "general")] = true;
-        player.status = "Checked In";
+        player.checkIns[eventId] = status;
         break;
       }
 
       case "addEvent": {
-        const event = {
-          id: id(),
-          title: clean(payload.title),
-          description: clean(payload.description),
-          startAt: payload.startAt || null,
-          status: clean(payload.status || "Upcoming"),
-          published: payload.published !== false
-        };
+        const title = text(payload.title, 150);
+        if (!title) throw new Error("Event title is required.");
 
-        if (!event.title) throw new Error("Event title is required.");
-        state.events.push(event);
-        result.event = event;
+        state.events.push({
+          id: makeId(),
+          title,
+          description: text(payload.description, 2000),
+          startAt: payload.startAt || null,
+          status: "Upcoming",
+          published: true
+        });
         break;
       }
 
       case "updateEvent": {
         const event = state.events.find(e => e.id === payload.id);
         if (!event) throw new Error("Event not found.");
-        Object.assign(event, payload);
+
+        if (payload.title !== undefined) event.title = text(payload.title, 150);
+        if (payload.description !== undefined) event.description = text(payload.description, 2000);
+        if (payload.status !== undefined) event.status = text(payload.status, 50);
+        if (payload.startAt !== undefined) event.startAt = payload.startAt;
+        if (payload.published !== undefined) event.published = !!payload.published;
         break;
       }
 
@@ -375,105 +473,128 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       }
 
       case "addMatch": {
-        const match = {
-          id: id(),
-          title: clean(payload.title),
-          eventId: payload.eventId || null,
-          teamIds: Array.isArray(payload.teamIds) ? payload.teamIds : [],
-          status: "Scheduled",
+        const title = text(payload.title, 150);
+        if (!title) throw new Error("Match name is required.");
+
+        const teamIds = Array.isArray(payload.teamIds)
+          ? payload.teamIds.filter(teamId => !!findTeam(teamId))
+          : [];
+
+        if (teamIds.length < 2) {
+          throw new Error("Select at least two valid teams for a match.");
+        }
+
+        state.matches.push({
+          id: makeId(),
+          title,
+          eventId: text(payload.eventId),
+          teamIds,
+          status: "scheduled",
           winnerTeamId: null,
           scheduledAt: payload.scheduledAt || null,
-          published: payload.published !== false
-        };
-
-        if (!match.title) throw new Error("Match title is required.");
-        state.matches.push(match);
-        result.match = match;
+          published: true
+        });
         break;
       }
 
       case "completeMatch": {
-        const match = state.matches.find(m => m.id === payload.id);
+        // The dashboard sends matchId, not id.
+        const matchId = payload.matchId || payload.id;
+        const match = state.matches.find(m => m.id === matchId);
+
         if (!match) throw new Error("Match not found.");
-        if (match.status === "Completed") throw new Error("This match is already completed.");
+        if (match.status === "completed") throw new Error("Match is already completed.");
 
         const winningTeamId = payload.winnerTeamId;
-        const team = state.teams.find(t => t.id === winningTeamId);
+        if (!match.teamIds.includes(winningTeamId)) {
+          throw new Error("The selected winner is not part of this match.");
+        }
 
+        const team = findTeam(winningTeamId);
         if (!team) throw new Error("Winning team not found.");
 
-        match.status = "Completed";
+        match.status = "completed";
         match.winnerTeamId = winningTeamId;
 
         team.wins = (team.wins || 0) + 1;
 
-        const points = Number(payload.points ?? 10);
+        const points = number(payload.points, 10);
         team.points = (team.points || 0) + points;
 
         team.memberIds.forEach(playerId => {
-          const player = state.players.find(p => p.id === playerId);
+          const player = findPlayer(playerId);
           if (player) player.points = (player.points || 0) + points;
         });
         break;
       }
 
       case "awardPoints": {
-        const player = state.players.find(p => p.id === payload.playerId);
-        if (!player) throw new Error("Player not found.");
+        const player = findPlayer(payload.playerId);
+        if (!player) throw new Error("Participant not found.");
 
-        const points = Number(payload.points);
-        if (!Number.isFinite(points)) throw new Error("Enter a valid point amount.");
+        // The dashboard sends amount.
+        const amount = number(payload.amount ?? payload.points, NaN);
+        if (!Number.isFinite(amount)) throw new Error("Enter a valid point amount.");
 
-        player.points = (player.points || 0) + points;
+        player.points = (player.points || 0) + amount;
         break;
       }
 
       case "addAchievement": {
-        const player = state.players.find(p => p.id === payload.playerId);
-        if (!player) throw new Error("Player not found.");
+        const player = findPlayer(payload.playerId);
+        if (!player) throw new Error("Participant not found.");
+
+        const name = text(payload.name || payload.achievement, 150);
+        if (!name) throw new Error("Achievement name is required.");
 
         player.achievements = player.achievements || [];
         player.achievements.push({
-          id: id(),
-          name: clean(payload.name || payload.achievement),
+          id: makeId(),
+          name,
           awardedAt: new Date().toISOString()
         });
         break;
       }
 
       case "addChallenge": {
-        const challenge = {
-          id: id(),
-          title: clean(payload.title),
-          description: clean(payload.description),
-          points: Number(payload.points) || 0,
-          achievement: clean(payload.achievement),
+        const title = text(payload.title, 150);
+        if (!title) throw new Error("Challenge title is required.");
+
+        state.challenges.push({
+          id: makeId(),
+          title,
+          description: text(payload.description, 2000),
+          points: number(payload.points, 0),
+          achievement: text(payload.achievement, 150),
           published: !!payload.published,
           completedBy: []
-        };
-
-        if (!challenge.title) throw new Error("Challenge title is required.");
-        state.challenges.push(challenge);
+        });
         break;
       }
 
       case "completeChallenge": {
-        const challenge = state.challenges.find(c => c.id === payload.id);
-        const player = state.players.find(p => p.id === payload.playerId);
-        if (!challenge || !player) throw new Error("Challenge or player not found.");
+        // The dashboard sends challengeId.
+        const challengeId = payload.challengeId || payload.id;
+        const challenge = state.challenges.find(c => c.id === challengeId);
+        const player = findPlayer(payload.playerId);
+
+        if (!challenge || !player) {
+          throw new Error("Challenge or participant not found.");
+        }
 
         challenge.completedBy = challenge.completedBy || [];
+
         if (challenge.completedBy.includes(player.id)) {
-          throw new Error("This player has already completed this challenge.");
+          throw new Error("This participant has already completed this challenge.");
         }
 
         challenge.completedBy.push(player.id);
-        player.points = (player.points || 0) + (Number(challenge.points) || 0);
+        player.points = (player.points || 0) + (challenge.points || 0);
 
         if (challenge.achievement) {
           player.achievements = player.achievements || [];
           player.achievements.push({
-            id: id(),
+            id: makeId(),
             name: challenge.achievement,
             awardedAt: new Date().toISOString()
           });
@@ -499,10 +620,15 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       }
 
       case "addAnnouncement": {
-        state.announcements.push({
-          id: id(),
-          title: clean(payload.title),
-          body: clean(payload.body),
+        const title = text(payload.title, 150);
+        const body = text(payload.body, 5000);
+
+        if (!title || !body) throw new Error("Title and message are required.");
+
+        state.announcements.unshift({
+          id: makeId(),
+          title,
+          body,
           published: !!payload.published,
           createdAt: new Date().toISOString()
         });
@@ -512,7 +638,10 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       case "updateAnnouncement": {
         const item = state.announcements.find(a => a.id === payload.id);
         if (!item) throw new Error("Announcement not found.");
-        Object.assign(item, payload);
+
+        if (payload.title !== undefined) item.title = text(payload.title, 150);
+        if (payload.body !== undefined) item.body = text(payload.body, 5000);
+        if (payload.published !== undefined) item.published = !!payload.published;
         break;
       }
 
@@ -522,28 +651,36 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       }
 
       case "publishWinner": {
-        const team = state.teams.find(t => t.id === payload.teamId);
-        if (!team) throw new Error("Winning team not found.");
+        const team = findTeam(payload.teamId);
+        if (!team) throw new Error("Select a valid winning team.");
 
         state.winner = {
-          id: id(),
+          id: makeId(),
           teamId: team.id,
           teamName: team.name,
-          message: clean(payload.message || "Congratulations to the champions!")
+          message: text(payload.message || "Congratulations to the champions!", 1000),
+          publishedAt: new Date().toISOString()
         };
 
         state.history.unshift({
-          id: id(),
+          id: makeId(),
           name: "The Nerolympics",
           winner: team.name,
           completedAt: new Date().toISOString()
         });
 
         team.memberIds.forEach(playerId => {
-          const player = state.players.find(p => p.id === playerId);
-          if (player) {
+          const player = findPlayer(playerId);
+          if (!player) return;
+
+          const alreadyListed = state.hallOfFame.some(
+            entry => entry.name === player.roblox &&
+              entry.description === `Member of ${team.name}, Nerolympics champions.`
+          );
+
+          if (!alreadyListed) {
             state.hallOfFame.unshift({
-              id: id(),
+              id: makeId(),
               name: player.roblox,
               description: `Member of ${team.name}, Nerolympics champions.`
             });
@@ -558,11 +695,21 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       }
 
       case "addPrize": {
+        // The dashboard sends playerId, not playerName.
+        const player = findPlayer(payload.playerId);
+        if (!player) throw new Error("Select a valid participant.");
+
+        const reward = text(payload.reward, 300);
+        if (!reward) throw new Error("Enter a reward.");
+
         state.prizes.push({
-          id: id(),
-          playerName: clean(payload.playerName),
-          reward: clean(payload.reward),
-          delivered: false
+          id: makeId(),
+          playerId: player.id,
+          playerName: player.roblox,
+          reward,
+          delivered: false,
+          public: !!payload.public,
+          createdAt: new Date().toISOString()
         });
         break;
       }
@@ -570,29 +717,41 @@ app.post("/api/staff/action", staffRequired, (req, res) => {
       case "updatePrize": {
         const prize = state.prizes.find(p => p.id === payload.id);
         if (!prize) throw new Error("Prize record not found.");
-        Object.assign(prize, payload);
+
+        if (payload.delivered !== undefined) prize.delivered = !!payload.delivered;
+        if (payload.reward !== undefined) prize.reward = text(payload.reward, 300);
+        if (payload.public !== undefined) prize.public = !!payload.public;
         break;
       }
 
       default:
-        throw new Error("Unknown staff action: " + clean(type));
+        throw new Error("Unknown action: " + type);
     }
 
     saveState();
-    res.json(result);
+    res.json({ success: true });
 
   } catch (error) {
-    res.status(400).json({ error: error.message || "Action failed." });
+    res.status(400).json({
+      error: error.message || "The requested action could not be completed."
+    });
   }
 });
 
 /* MVP RESULTS */
 
 app.get("/api/mvp", staffRequired, (req, res) => {
-  const results = Object.entries(state.mvpVotes).map(([playerId, votes]) => {
-    const player = state.players.find(p => p.id === playerId);
-    return player ? { roblox: player.roblox, votes } : null;
-  }).filter(Boolean).sort((a,b) => b.votes - a.votes);
+  const results = Object.entries(state.mvpVotes)
+    .map(([playerId, votes]) => {
+      const player = findPlayer(playerId);
+      return player ? {
+        playerId,
+        roblox: player.roblox,
+        votes
+      } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.votes - a.votes);
 
   res.json({
     open: !!state.settings.mvpOpen,
@@ -603,51 +762,49 @@ app.get("/api/mvp", staffRequired, (req, res) => {
 /* BACKUP AND RESTORE */
 
 app.get("/api/staff/backup", staffRequired, (req, res) => {
-  res.setHeader("Content-Disposition", 'attachment; filename="nerolympics-backup.json"');
+  res.setHeader(
+    "Content-Disposition",
+    'attachment; filename="nerolympics-backup.json"'
+  );
   res.setHeader("Content-Type", "application/json");
   res.send(JSON.stringify(state, null, 2));
 });
 
-app.post("/api/staff/restore", staffRequired, (req, res) => {
+app.post("/api/staff/restore", adminRequired, (req, res) => {
   try {
     const incoming = req.body;
 
-    if (!incoming || !Array.isArray(incoming.players) || !Array.isArray(incoming.teams)) {
+    if (!incoming ||
+        !Array.isArray(incoming.players) ||
+        !Array.isArray(incoming.teams)) {
       return res.status(400).json({ error: "Invalid backup file." });
     }
 
+    const defaults = createEmptyState();
+
     state = {
-      ...emptyState(),
+      ...defaults,
       ...incoming,
-      settings: { ...emptyState().settings, ...(incoming.settings || {}) }
+      settings: { ...defaults.settings, ...(incoming.settings || {}) }
     };
 
     saveState();
     res.json({ success: true });
 
-  } catch {
+  } catch (error) {
     res.status(400).json({ error: "Could not restore backup." });
   }
 });
 
-/* LEGACY API ALIASES */
+/* ERROR HANDLER */
 
-app.get("/api/data", (req, res) => res.json(publicState()));
-app.get("/api/session", (req, res) => {
-  res.json({ authenticated: !!req.session.staff, staff: req.session.staff || null });
+app.use((error, req, res, next) => {
+  console.error(error);
+  if (res.headersSent) return next(error);
+  res.status(500).json({ error: "An unexpected server error occurred." });
 });
 
-app.post("/api/login", (req, res) => {
-  req.url = "/api/staff/login";
-  app.handle(req, res);
-});
-
-app.post("/api/logout", (req, res) => {
-  req.url = "/api/staff/logout";
-  app.handle(req, res);
-});
-
-/* START */
+/* START SERVER */
 
 app.listen(PORT, () => {
   console.log(`Nerolympics server running on port ${PORT}`);
