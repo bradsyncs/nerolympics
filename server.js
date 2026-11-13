@@ -1,42 +1,39 @@
-const express = require("express");
-const session = require("express-session");
-const PgSession = require("connect-pg-simple")(session);
-const { Pool } = require("pg");
-const path = require("path");
-const crypto = require("crypto");
+const express = require('express');
+const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
-
-app.set("trust proxy", 1);
-
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
+const DATABASE_URL = process.env.DATABASE_URL;
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
-if (!process.env.DATABASE_URL) {
-  console.error("Missing DATABASE_URL environment variable.");
+if (!DATABASE_URL || !SESSION_SECRET) {
+  console.error('DATABASE_URL and SESSION_SECRET must be set in Render.');
   process.exit(1);
 }
 
-if (!process.env.SESSION_SECRET) {
-  console.error("Missing SESSION_SECRET environment variable.");
-  process.exit(1);
-}
-
-if (
-  !process.env.ADMIN_USERNAME ||
-  !process.env.ADMIN_PASSWORD ||
-  !process.env.STAFF_USERNAME ||
-  !process.env.STAFF_PASSWORD
-) {
-  console.error("Missing staff or admin login environment variables.");
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD || !process.env.STAFF_USERNAME || !process.env.STAFF_PASSWORD) {
+  console.error('Set ADMIN_USERNAME, ADMIN_PASSWORD, STAFF_USERNAME and STAFF_PASSWORD in Render.');
   process.exit(1);
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
-    ? { rejectUnauthorized: false }
-    : false
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 5,
+  idleTimeoutMillis: 30000
 });
+
+const appDir = __dirname;
+const publicDir = path.join(appDir, 'public');
+const SCHEMA_VERSION = 2;
+const HISTORY_LIMIT = 60;
+const RECYCLE_LIMIT = 500;
+const BACKUP_LIMIT = 30;
 
 const DEFAULT_PERMISSIONS = {
   addPlayer: true,
@@ -63,39 +60,39 @@ const DEFAULT_PERMISSIONS = {
   addAnnouncement: true,
   updateAnnouncement: true,
   deleteAnnouncement: false,
+  publishWinner: false,
+  clearWinner: false,
   selectMvp: true,
+  publishMvp: false,
   addPrize: true,
   updatePrize: true,
   deletePrize: false,
   bulkPrizeDelivered: true,
   bulkPlayerStatus: true,
   bulkAwardPoints: true,
-  bulkAssignTeam: true,
   bulkDeletePlayers: false,
-  bulkDeleteTeams: false,
   bulkPublishAnnouncements: true,
   bulkDeleteAnnouncements: false,
+  bulkAssignTeam: true,
+  bulkDeleteTeams: false,
   restoreRecycleItem: true,
-  bulkRestoreRecycleItems: true,
-  publishWinner: true
+  bulkRestoreRecycleItems: true
 };
 
 const ADMIN_ONLY_ACTIONS = new Set([
-  "resetTeams",
-  "clearWinner",
-  "publishWinner",
-  "updatePermissions",
-  "setMaintenance",
-  "undo",
-  "restoreVersion",
-  "permanentDeleteRecycleItem",
-  "bulkPermanentDeleteRecycleItems",
-  "emptyRecycleBin",
-  "createBackup",
-  "importBackup"
+  'clearWinner',
+  'permanentDeleteRecycleItem',
+  'emptyRecycleBin',
+  'restoreVersion',
+  'undo',
+  'importBackup',
+  'updatePermissions',
+  'setMaintenance',
+  'createBackup'
 ]);
 
 const DEFAULT_STATE = {
+  schemaVersion: SCHEMA_VERSION,
   players: [],
   teams: [],
   events: [],
@@ -103,54 +100,47 @@ const DEFAULT_STATE = {
   challenges: [],
   announcements: [],
   prizes: [],
-  recycleBin: [],
-  versions: [],
-  activityLog: [],
-  backups: [],
   settings: {
     teamsPublished: false,
     maintenanceMode: false,
-    maintenanceMessage: "The Nerolympics website is currently undergoing maintenance. Please check back soon.",
+    maintenanceMessage: 'The Nerolympics website is temporarily under maintenance. Please check back soon.',
     staffPermissions: { ...DEFAULT_PERMISSIONS },
     mvp: {
       playerId: null,
-      message: "",
+      message: '',
       published: false,
       publishedAt: null
     }
   },
   winner: null,
   history: [],
-  hallOfFame: []
+  hallOfFame: [],
+  activityLog: [],
+  versions: [],
+  recycleBin: [],
+  backups: []
 };
 
-const SNAPSHOT_LIMIT = 40;
-const RECYCLE_LIMIT = 500;
-const ACTIVITY_LIMIT = 300;
-const BACKUP_LIMIT = 30;
-
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
   store: new PgSession({
     pool,
-    tableName: "user_sessions",
+    tableName: 'user_sessions',
     createTableIfMissing: true
   }),
-  secret: process.env.SESSION_SECRET,
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  name: "nerolympics.sid",
+  name: 'nerolympics.sid',
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
     maxAge: 12 * 60 * 60 * 1000
   }
 }));
-
-app.use(express.static(path.join(__dirname, "public")));
 
 function id() {
   return crypto.randomUUID();
@@ -160,36 +150,47 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function cleanState(input) {
+function text(value, max = 500) {
+  return String(value ?? '').trim().slice(0, max);
+}
+
+function num(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function bool(value) {
+  return value === true || value === 'true';
+}
+
+function normalizeState(input) {
   const state = {
     ...clone(DEFAULT_STATE),
-    ...(input && typeof input === "object" ? input : {})
+    ...(input && typeof input === 'object' ? input : {})
   };
 
-  const arrayKeys = [
-    "players",
-    "teams",
-    "events",
-    "matches",
-    "challenges",
-    "announcements",
-    "prizes",
-    "recycleBin",
-    "versions",
-    "activityLog",
-    "backups",
-    "history",
-    "hallOfFame"
-  ];
-
-  for (const key of arrayKeys) {
+  for (const key of [
+    'players',
+    'teams',
+    'events',
+    'matches',
+    'challenges',
+    'announcements',
+    'prizes',
+    'history',
+    'hallOfFame',
+    'activityLog',
+    'versions',
+    'recycleBin',
+    'backups'
+  ]) {
     if (!Array.isArray(state[key])) {
       state[key] = [];
     }
   }
 
   state.settings = {
-    ...DEFAULT_STATE.settings,
+    ...clone(DEFAULT_STATE.settings),
     ...(state.settings || {})
   };
 
@@ -203,66 +204,78 @@ function cleanState(input) {
     ...(state.settings.mvp || {})
   };
 
-  if (!state.settings.maintenanceMessage) {
-    state.settings.maintenanceMessage =
-      DEFAULT_STATE.settings.maintenanceMessage;
-  }
+  // Remove fields belonging to the retired Previous Clans
+  // and public MVP voting features.
+  delete state.mvpVotes;
+  delete state.settings.mvpOpen;
 
-  // Remove the retired Previous Clans field from old records.
-  state.players = state.players.map(player => {
-    const clean = { ...player };
-    delete clean.previousClans;
-    return clean;
+  state.players.forEach(player => {
+    delete player.previousClans;
   });
+
+  state.recycleBin.forEach(item => {
+    if (item.type === 'player' && item.record) {
+      delete item.record.previousClans;
+    }
+  });
+
+  state.schemaVersion = SCHEMA_VERSION;
 
   return state;
 }
 
-async function initializeDatabase() {
+async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS event_state (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      id INTEGER PRIMARY KEY CHECK (id=1),
       data JSONB NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
 
   await pool.query(`
-    INSERT INTO event_state (id, data)
-    VALUES (1, $1::jsonb)
-    ON CONFLICT (id) DO NOTHING
-  `, [JSON.stringify(DEFAULT_STATE)]);
+    CREATE TABLE IF NOT EXISTS automatic_backups (
+      id BIGSERIAL PRIMARY KEY,
+      data JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 
-  console.log("Nerolympics database ready.");
+  await pool.query(
+    `INSERT INTO event_state(id,data)
+     VALUES(1,$1::jsonb)
+     ON CONFLICT(id) DO NOTHING`,
+    [JSON.stringify(DEFAULT_STATE)]
+  );
+
+  const state = await getState();
+  await saveState(state);
+
+  console.log('Nerolympics database ready.');
 }
 
 async function getState(client = pool) {
   const result = await client.query(
-    "SELECT data FROM event_state WHERE id = 1"
+    'SELECT data FROM event_state WHERE id=1'
   );
 
-  if (!result.rows.length) {
-    return cleanState(DEFAULT_STATE);
-  }
-
-  return cleanState(result.rows[0].data);
+  return normalizeState(result.rows[0]?.data || DEFAULT_STATE);
 }
 
 async function saveState(state, client = pool) {
-  await client.query(`
-    INSERT INTO event_state (id, data, updated_at)
-    VALUES (1, $1::jsonb, NOW())
-    ON CONFLICT (id)
-    DO UPDATE SET
-      data = EXCLUDED.data,
-      updated_at = NOW()
-  `, [JSON.stringify(cleanState(state))]);
+  await client.query(
+    `INSERT INTO event_state(id,data,updated_at)
+     VALUES(1,$1::jsonb,NOW())
+     ON CONFLICT(id)
+     DO UPDATE SET data=EXCLUDED.data, updated_at=NOW()`,
+    [JSON.stringify(normalizeState(state))]
+  );
 }
 
 function requireStaff(req, res, next) {
-  if (!req.session || !req.session.role) {
+  if (!req.session?.role) {
     return res.status(401).json({
-      error: "Staff login required."
+      error: 'Staff login required.'
     });
   }
 
@@ -270,405 +283,277 @@ function requireStaff(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.session || req.session.role !== "admin") {
+  if (req.session?.role !== 'admin') {
     return res.status(403).json({
-      error: "Administrator access required."
+      error: 'Admin access required.'
     });
   }
 
   next();
 }
 
-function addActivity(state, summary) {
-  state.activityLog.unshift({
-    id: id(),
-    summary: String(summary),
-    timestamp: new Date().toISOString()
-  });
+function checkPermission(state, role, action) {
+  if (role === 'admin') {
+    return true;
+  }
 
-  state.activityLog = state.activityLog.slice(0, ACTIVITY_LIMIT);
+  if (ADMIN_ONLY_ACTIONS.has(action)) {
+    return false;
+  }
+
+  return state.settings.staffPermissions[action] === true;
 }
 
-function createSnapshot(state, summary) {
-  const snapshot = clone(state);
+function publicState(state) {
+  const players = state.players
+    .filter(p => p.status !== 'Disqualified')
+    .map(p => ({
+      id: p.id,
+      roblox: p.roblox,
+      status: p.status,
+      points: num(p.points),
+      teamId: p.teamId || null,
+      achievements: Array.isArray(p.achievements)
+        ? p.achievements
+        : []
+    }));
 
-  snapshot.versions = [];
-  snapshot.activityLog = [];
-  snapshot.backups = [];
+  const teams = state.settings.teamsPublished
+    ? state.teams.map(t => ({
+        id: t.id,
+        name: t.name,
+        captain: t.captain || '',
+        memberIds: t.memberIds || [],
+        wins: num(t.wins),
+        points: num(t.points)
+      }))
+    : [];
 
-  state.versions.unshift({
-    id: id(),
-    summary: String(summary || "Saved version"),
-    createdAt: new Date().toISOString(),
-    snapshot
-  });
+  const mvpPlayer = state.settings.mvp.published
+    ? players.find(p => p.id === state.settings.mvp.playerId)
+    : null;
 
-  state.versions = state.versions.slice(0, SNAPSHOT_LIMIT);
+  return {
+    players,
+    teams,
+    events: state.events.filter(e => e.published !== false),
+    matches: state.matches.filter(m => m.published !== false),
+    challenges: state.challenges.filter(c => c.published),
+    announcements: state.announcements.filter(a => a.published),
+    prizes: state.prizes.filter(p => p.public && p.delivered),
+    settings: {
+      teamsPublished: !!state.settings.teamsPublished,
+      maintenanceMode: !!state.settings.maintenanceMode
+    },
+    winner: state.winner?.published ? state.winner : null,
+    history: state.history,
+    hallOfFame: state.hallOfFame,
+    mvp: mvpPlayer
+      ? {
+          player: mvpPlayer,
+          message: state.settings.mvp.message,
+          publishedAt: state.settings.mvp.publishedAt
+        }
+      : null
+  };
 }
 
-function moveToRecycleBin(state, type, record) {
-  if (!record) return;
+function summaryFor(type, p) {
+  const names = {
+    addPlayer: `Added participant ${p.roblox || ''}`,
+    updatePlayer: `Updated participant ${p.roblox || ''}`,
+    deletePlayer: 'Moved participant to Recycle Bin',
+    generateTeams: 'Generated teams',
+    publishTeams: 'Published teams',
+    resetTeams: 'Moved teams to Recycle Bin',
+    updateTeam: `Updated team ${p.name || ''}`,
+    checkin: 'Updated participant check-in',
+    bulkCheckin: 'Updated multiple check-ins',
+    addEvent: `Created event ${p.title || ''}`,
+    updateEvent: `Updated event ${p.title || ''}`,
+    deleteEvent: 'Moved event to Recycle Bin',
+    addMatch: `Created match ${p.title || ''}`,
+    updateMatch: `Updated match ${p.title || ''}`,
+    completeMatch: 'Completed match',
+    deleteMatch: 'Moved match to Recycle Bin',
+    awardPoints: 'Awarded points',
+    bulkAwardPoints: 'Awarded points to multiple participants',
+    addAchievement: 'Added achievement',
+    addChallenge: `Created challenge ${p.title || ''}`,
+    completeChallenge: 'Completed challenge',
+    deleteChallenge: 'Moved challenge to Recycle Bin',
+    addAnnouncement: `Created announcement ${p.title || ''}`,
+    updateAnnouncement: 'Updated announcement',
+    deleteAnnouncement: 'Moved announcement to Recycle Bin',
+    publishWinner: 'Published event winner',
+    clearWinner: 'Cleared event winner',
+    selectMvp: 'Selected MVP',
+    publishMvp: 'Published MVP',
+    addPrize: 'Added prize record',
+    updatePrize: 'Updated prize record',
+    deletePrize: 'Moved prize to Recycle Bin',
+    bulkPlayerStatus: 'Changed participant statuses',
+    bulkDeletePlayers: 'Moved participants to Recycle Bin',
+    bulkAssignTeam: 'Assigned participants to a team',
+    bulkPrizeDelivered: 'Updated prize delivery statuses',
+    bulkPublishAnnouncements: 'Updated announcement publication',
+    bulkDeleteAnnouncements: 'Moved announcements to Recycle Bin',
+    bulkDeleteTeams: 'Moved teams to Recycle Bin',
+    restoreRecycleItem: 'Restored item from Recycle Bin',
+    bulkRestoreRecycleItems: 'Restored multiple Recycle Bin items'
+  };
 
+  return names[type] || `Performed ${type}`;
+}
+
+function pushRecycle(state, type, record) {
   state.recycleBin.unshift({
     id: id(),
     type,
-    record: clone(record),
-    deletedAt: new Date().toISOString()
+    deletedAt: new Date().toISOString(),
+    record: clone(record)
   });
 
   state.recycleBin = state.recycleBin.slice(0, RECYCLE_LIMIT);
 }
 
-function removePlayerFromTeams(state, playerId) {
-  for (const team of state.teams) {
-    team.memberIds = (team.memberIds || [])
-      .filter(memberId => memberId !== playerId);
-  }
-}
+function findById(list, itemId, label) {
+  const item = list.find(x => x.id === itemId);
 
-function assignPlayerToTeam(state, player, teamId) {
-  removePlayerFromTeams(state, player.id);
-
-  player.teamId = teamId || null;
-
-  if (teamId) {
-    const team = state.teams.find(x => x.id === teamId);
-
-    if (!team) {
-      throw new Error("Team not found.");
-    }
-
-    if (!Array.isArray(team.memberIds)) {
-      team.memberIds = [];
-    }
-
-    if (!team.memberIds.includes(player.id)) {
-      team.memberIds.push(player.id);
-    }
-  }
-}
-
-function findRecord(array, recordId, label) {
-  const record = array.find(x => x.id === recordId);
-
-  if (!record) {
+  if (!item) {
     throw new Error(`${label} not found.`);
-  }
-
-  return record;
-}
-
-function restoreRecycleRecord(state, recycleId) {
-  const index = state.recycleBin.findIndex(x => x.id === recycleId);
-
-  if (index === -1) {
-    throw new Error("Recycle Bin record not found.");
-  }
-
-  const item = state.recycleBin[index];
-  const record = clone(item.record);
-
-  const destinations = {
-    player: "players",
-    team: "teams",
-    event: "events",
-    match: "matches",
-    challenge: "challenges",
-    announcement: "announcements",
-    prize: "prizes"
-  };
-
-  const destination = destinations[item.type];
-
-  if (!destination) {
-    throw new Error("This record type cannot be restored.");
-  }
-
-  if (state[destination].some(x => x.id === record.id)) {
-    throw new Error("A record with this ID already exists.");
-  }
-
-  state[destination].push(record);
-  state.recycleBin.splice(index, 1);
-
-  if (item.type === "player" && record.teamId) {
-    const team = state.teams.find(x => x.id === record.teamId);
-
-    if (team) {
-      team.memberIds = team.memberIds || [];
-
-      if (!team.memberIds.includes(record.id)) {
-        team.memberIds.push(record.id);
-      }
-    }
   }
 
   return item;
 }
 
-function validateBackup(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return false;
-  }
+function takeSnapshot(state, summary) {
+  const snap = clone(state);
 
-  const data = body.data || body.state || body;
+  snap.versions = [];
+  snap.backups = [];
 
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return false;
-  }
+  state.versions.unshift({
+    id: id(),
+    createdAt: new Date().toISOString(),
+    summary,
+    snapshot: snap
+  });
 
-  const required = [
-    "players",
-    "teams",
-    "events",
-    "matches",
-    "challenges",
-    "announcements",
-    "prizes"
-  ];
-
-  return required.every(key => Array.isArray(data[key]));
+  state.versions = state.versions.slice(0, HISTORY_LIMIT);
 }
 
-function safePublicState(state) {
-  const players = state.players
-    .filter(player => player.status !== "Disqualified")
-    .map(player => ({
-      id: player.id,
-      roblox: player.roblox,
-      status: player.status,
-      points: Number(player.points || 0),
-      teamId: player.teamId || null,
-      achievements: player.achievements || []
-    }));
+function logActivity(state, summary, type) {
+  state.activityLog.unshift({
+    id: id(),
+    timestamp: new Date().toISOString(),
+    summary,
+    type
+  });
 
-  const teams = state.settings.teamsPublished
-    ? state.teams.map(team => ({
-        id: team.id,
-        name: team.name,
-        captain: team.captain || "",
-        memberIds: team.memberIds || [],
-        wins: Number(team.wins || 0),
-        points: Number(team.points || 0)
-      }))
-    : [];
+  state.activityLog = state.activityLog.slice(0, 250);
+}
 
-  const mvp = state.settings.mvp || {};
+function restoreRecycleRecord(state, index) {
+  const item = state.recycleBin[index];
 
-  return {
-    players,
-    teams,
-    events: state.events.filter(x => x.published !== false),
-    matches: state.matches.filter(x => x.published !== false),
-    challenges: state.challenges.filter(x => x.published),
-    announcements: state.announcements.filter(x => x.published),
-    prizes: state.prizes.filter(x => x.public),
-    settings: {
-      teamsPublished: Boolean(state.settings.teamsPublished),
-      maintenanceMode: Boolean(state.settings.maintenanceMode)
-    },
-    winner: state.winner && state.winner.published
-      ? state.winner
-      : null,
-    history: state.history,
-    hallOfFame: state.hallOfFame,
-    mvp: {
-      playerId: mvp.published ? mvp.playerId : null,
-      message: mvp.published ? mvp.message : "",
-      published: Boolean(mvp.published),
-      publishedAt: mvp.publishedAt || null
-    }
+  if (!item || !item.record || typeof item.record !== 'object') {
+    throw new Error('Recycle Bin record is invalid.');
+  }
+
+  const destinations = {
+    player: 'players',
+    team: 'teams',
+    event: 'events',
+    match: 'matches',
+    challenge: 'challenges',
+    announcement: 'announcements',
+    prize: 'prizes'
   };
-}
 
-function publicMaintenancePage(message) {
-  const safeMessage = String(message || "")
-    .replace(/[&<>"']/g, character => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    })[character]);
+  const destination = destinations[item.type];
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nerolympics | Maintenance</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;
-background:#090910;color:#fff;font-family:Arial,sans-serif;padding:24px}
-main{max-width:620px;text-align:center;padding:48px 30px;
-border:1px solid #39304e;border-radius:20px;
-background:linear-gradient(145deg,#171329,#11121b)}
-h1{font-size:clamp(28px,6vw,44px);margin:0 0 18px}
-p{color:#c8c3dc;line-height:1.7}
-</style>
-</head>
-<body>
-<main>
-<h1>The Nerolympics</h1>
-<p>${safeMessage}</p>
-</main>
-</body>
-</html>`;
-}
-
-// Public maintenance mode does not block staff pages or API routes.
-app.get("/", async (req, res, next) => {
-  try {
-    const state = await getState();
-
-    if (state.settings.maintenanceMode) {
-      return res.status(503).send(
-        publicMaintenancePage(state.settings.maintenanceMessage)
-      );
-    }
-
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/staff", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "staff.html"));
-});
-
-app.get("/api/public/state", async (req, res) => {
-  try {
-    const state = await getState();
-
-    if (state.settings.maintenanceMode) {
-      return res.status(503).json({
-        maintenanceMode: true,
-        message: state.settings.maintenanceMessage
-      });
-    }
-
-    res.json(safePublicState(state));
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "Unable to load event data."
-    });
-  }
-});
-
-app.post("/api/staff/login", (req, res) => {
-  const { username, password } = req.body || {};
-
-  const adminMatch =
-    username === process.env.ADMIN_USERNAME &&
-    password === process.env.ADMIN_PASSWORD;
-
-  const staffMatch =
-    username === process.env.STAFF_USERNAME &&
-    password === process.env.STAFF_PASSWORD;
-
-  if (!adminMatch && !staffMatch) {
-    return res.status(401).json({
-      error: "Incorrect username or password."
-    });
+  if (!destination) {
+    throw new Error('Unsupported restore type.');
   }
 
-  req.session.regenerate(error => {
-    if (error) {
-      return res.status(500).json({
-        error: "Login failed."
-      });
-    }
+  if (state[destination].some(record => record.id === item.record.id)) {
+    throw new Error('A record with that ID already exists.');
+  }
 
-    req.session.role = adminMatch ? "admin" : "staff";
-    req.session.username = username;
+  const record = clone(item.record);
 
-    req.session.save(saveError => {
-      if (saveError) {
-        return res.status(500).json({
-          error: "Unable to save login session."
-        });
+  if (item.type === 'team') {
+    record.memberIds = [
+      ...new Set(
+        (record.memberIds || []).filter(playerId =>
+          state.players.some(player => player.id === playerId)
+        )
+      )
+    ];
+  }
+
+  state[destination].push(record);
+  state.recycleBin.splice(index, 1);
+
+  if (item.type === 'team') {
+    record.memberIds.forEach(playerId => {
+      const player = state.players.find(entry => entry.id === playerId);
+
+      if (player) {
+        if (player.teamId && player.teamId !== record.id) {
+          const previousTeam = state.teams.find(
+            team => team.id === player.teamId
+          );
+
+          if (previousTeam) {
+            previousTeam.memberIds = (previousTeam.memberIds || [])
+              .filter(id => id !== playerId);
+          }
+        }
+
+        player.teamId = record.id;
       }
-
-      res.json({
-        success: true,
-        role: req.session.role
-      });
-    });
-  });
-});
-
-app.post("/api/staff/logout", requireStaff, (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie("nerolympics.sid");
-    res.json({ success: true });
-  });
-});
-
-app.get("/api/staff/me", (req, res) => {
-  res.json({
-    authenticated: Boolean(req.session?.role),
-    role: req.session?.role || null,
-    username: req.session?.username || null
-  });
-});
-
-app.get("/api/staff/state", requireStaff, async (req, res) => {
-  try {
-    const state = await getState();
-
-    if (req.session.role !== "admin") {
-      state.versions = [];
-      state.backups = [];
-      state.settings.staffPermissions = {};
-    }
-
-    res.json(state);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "Unable to load staff data."
     });
   }
-});
 
-function permissionForAction(type) {
-  const aliases = {
-    bulkDeletePlayers: "bulkDeletePlayers",
-    bulkDeleteTeams: "bulkDeleteTeams",
-    bulkDeleteAnnouncements: "bulkDeleteAnnouncements",
-    bulkRestoreRecycleItems: "bulkRestoreRecycleItems",
-    bulkPrizeDelivered: "bulkPrizeDelivered"
-  };
+  if (item.type === 'player' && record.teamId) {
+    const team = state.teams.find(entry => entry.id === record.teamId);
 
-  return aliases[type] || type;
+    if (team) {
+      team.memberIds ||= [];
+
+      if (!team.memberIds.includes(record.id)) {
+        team.memberIds.push(record.id);
+      }
+    } else {
+      record.teamId = null;
+    }
+  }
 }
 
-async function performAction(state, type, payload) {
-  const p = payload || {};
+async function performAction(state, type, p) {
   const now = new Date().toISOString();
 
   switch (type) {
-    case "addPlayer": {
-      const roblox = String(p.roblox || "").trim();
+    case 'addPlayer': {
+      const roblox = text(p.roblox, 40);
 
       if (!roblox) {
-        throw new Error("Roblox username is required.");
+        throw new Error('Roblox username is required.');
       }
 
       if (state.players.some(x =>
-        String(x.roblox).toLowerCase() === roblox.toLowerCase()
+        x.roblox.toLowerCase() === roblox.toLowerCase()
       )) {
-        throw new Error("This participant is already registered.");
+        throw new Error('That Roblox username is already registered.');
       }
 
       state.players.push({
         id: id(),
         roblox,
-        discord: String(p.discord || "").trim(),
-        status: p.status || "Registered",
+        discord: text(p.discord, 80),
+        status: text(p.status || 'Registered', 40),
         points: 0,
         teamId: null,
         registeredAt: now,
@@ -679,1078 +564,1592 @@ async function performAction(state, type, payload) {
       break;
     }
 
-    case "updatePlayer": {
-      const player = findRecord(state.players, p.id, "Participant");
+    case 'updatePlayer': {
+      const player = findById(state.players, p.id, 'Participant');
 
       if (p.roblox !== undefined) {
-        player.roblox = String(p.roblox).trim();
+        const username = text(p.roblox, 40);
+
+        if (!username) {
+          throw new Error('Roblox username is required.');
+        }
+
+        if (state.players.some(x =>
+          x.id !== player.id &&
+          x.roblox.toLowerCase() === username.toLowerCase()
+        )) {
+          throw new Error('That Roblox username is already registered.');
+        }
+
+        player.roblox = username;
       }
 
       if (p.discord !== undefined) {
-        player.discord = String(p.discord).trim();
+        player.discord = text(p.discord, 80);
       }
 
       if (p.status !== undefined) {
-        player.status = String(p.status);
+        player.status = text(p.status, 40);
       }
 
       if (p.points !== undefined) {
-        const points = Number(p.points);
-
-        if (!Number.isFinite(points)) {
-          throw new Error("Invalid points value.");
-        }
-
-        player.points = points;
+        player.points = num(p.points);
       }
 
-      break;
-    }
+      if (p.teamId !== undefined) {
+        const nextTeamId = p.teamId || null;
 
-    case "deletePlayer": {
-      const player = findRecord(state.players, p.id, "Participant");
-
-      moveToRecycleBin(state, "player", player);
-      state.players = state.players.filter(x => x.id !== p.id);
-      removePlayerFromTeams(state, p.id);
-
-      break;
-    }
-
-    case "bulkDeletePlayers": {
-      const ids = p.playerIds || [];
-
-      for (const playerId of ids) {
-        const player = state.players.find(x => x.id === playerId);
-
-        if (player) {
-          moveToRecycleBin(state, "player", player);
-          removePlayerFromTeams(state, playerId);
+        if (nextTeamId) {
+          findById(state.teams, nextTeamId, 'Team');
         }
-      }
 
-      state.players = state.players.filter(x => !ids.includes(x.id));
-      break;
-    }
+        if (player.teamId) {
+          const previousTeam = state.teams.find(
+            team => team.id === player.teamId
+          );
 
-    case "bulkPlayerStatus": {
-      const ids = p.playerIds || [];
+          if (previousTeam) {
+            previousTeam.memberIds = (previousTeam.memberIds || [])
+              .filter(playerId => playerId !== player.id);
+          }
+        }
 
-      for (const player of state.players) {
-        if (ids.includes(player.id)) {
-          player.status = String(p.status || player.status);
+        player.teamId = nextTeamId;
+
+        if (nextTeamId) {
+          const nextTeam = state.teams.find(
+            team => team.id === nextTeamId
+          );
+
+          nextTeam.memberIds ||= [];
+
+          if (!nextTeam.memberIds.includes(player.id)) {
+            nextTeam.memberIds.push(player.id);
+          }
         }
       }
 
       break;
     }
 
-    case "bulkAwardPoints": {
-      const amount = Number(p.amount);
+    case 'deletePlayer': {
+      const index = state.players.findIndex(x => x.id === p.id);
 
-      if (!Number.isFinite(amount)) {
-        throw new Error("Invalid points amount.");
+      if (index < 0) {
+        throw new Error('Participant not found.');
       }
 
-      for (const player of state.players) {
-        if ((p.playerIds || []).includes(player.id)) {
-          player.points = Number(player.points || 0) + amount;
-        }
-      }
+      const [player] = state.players.splice(index, 1);
+
+      pushRecycle(state, 'player', player);
+
+      state.teams.forEach(team => {
+        team.memberIds = (team.memberIds || [])
+          .filter(x => x !== player.id);
+      });
 
       break;
     }
 
-    case "bulkAssignTeam": {
-      const ids = p.playerIds || [];
-
-      for (const player of state.players) {
-        if (ids.includes(player.id)) {
-          assignPlayerToTeam(state, player, p.teamId || null);
-        }
-      }
-
-      break;
-    }
-
-    case "generateTeams": {
-      const size = Math.floor(Number(p.size));
-
-      if (!Number.isInteger(size) || size < 1) {
-        throw new Error("Enter a valid team size.");
-      }
-
-      const eligible = state.players.filter(
-        x => x.status !== "Disqualified"
+    case 'generateTeams': {
+      const size = Math.max(
+        1,
+        Math.min(20, Math.floor(num(p.size, 5)))
       );
 
-      const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+      const eligible = state.players.filter(
+        x => x.status !== 'Disqualified'
+      );
+
+      for (let i = eligible.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(i + 1);
+        [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+      }
+
+      state.teams.forEach(team => {
+        pushRecycle(state, 'team', team);
+      });
 
       state.teams = [];
 
-      for (let i = 0; i < shuffled.length; i += size) {
-        const members = shuffled.slice(i, i + size);
+      eligible.forEach((player, index) => {
+        const teamIndex = Math.floor(index / size);
 
-        const team = {
-          id: id(),
-          name: `Team ${state.teams.length + 1}`,
-          captain: members[0]?.roblox || "",
-          memberIds: members.map(x => x.id),
-          wins: 0,
-          points: 0
-        };
-
-        state.teams.push(team);
-
-        for (const player of members) {
-          player.teamId = team.id;
+        if (!state.teams[teamIndex]) {
+          state.teams[teamIndex] = {
+            id: id(),
+            name: `Team ${teamIndex + 1}`,
+            captain: '',
+            memberIds: [],
+            wins: 0,
+            points: 0
+          };
         }
-      }
+
+        state.teams[teamIndex].memberIds.push(player.id);
+        player.teamId = state.teams[teamIndex].id;
+      });
 
       state.settings.teamsPublished = false;
-      state.winner = null;
 
       break;
     }
 
-    case "publishTeams":
-      if (!state.teams.length) {
-        throw new Error("Generate teams first.");
-      }
-
+    case 'publishTeams':
       state.settings.teamsPublished = true;
       break;
 
-    case "resetTeams":
-      for (const team of state.teams) {
-        moveToRecycleBin(state, "team", team);
-      }
+    case 'resetTeams':
+      state.teams.forEach(team => {
+        pushRecycle(state, 'team', team);
+      });
 
       state.teams = [];
-      state.settings.teamsPublished = false;
-
-      for (const player of state.players) {
+      state.players.forEach(player => {
         player.teamId = null;
-      }
+      });
+      state.settings.teamsPublished = false;
 
       break;
 
-    case "updateTeam": {
-      const team = findRecord(state.teams, p.id, "Team");
+    case 'updateTeam': {
+      const team = findById(state.teams, p.id, 'Team');
 
       if (p.name !== undefined) {
-        team.name = String(p.name);
+        team.name = text(p.name, 60);
       }
 
       if (p.captain !== undefined) {
-        team.captain = String(p.captain);
+        team.captain = text(p.captain, 60);
       }
 
-      break;
-    }
+      if (p.memberIds !== undefined) {
+        const ids = [
+          ...new Set(
+            (Array.isArray(p.memberIds) ? p.memberIds : [])
+              .filter(pid => state.players.some(x => x.id === pid))
+          )
+        ];
 
-    case "bulkDeleteTeams": {
-      const ids = p.ids || [];
-
-      for (const teamId of ids) {
-        const team = state.teams.find(x => x.id === teamId);
-
-        if (team) {
-          moveToRecycleBin(state, "team", team);
-
-          for (const player of state.players) {
-            if (player.teamId === teamId) {
-              player.teamId = null;
-            }
+        state.players.forEach(player => {
+          if (player.teamId === team.id) {
+            player.teamId = null;
           }
-        }
-      }
+        });
 
-      state.teams = state.teams.filter(x => !ids.includes(x.id));
-      break;
-    }
+        team.memberIds = ids;
 
-    case "checkin": {
-      const player = findRecord(state.players, p.playerId, "Participant");
-
-      if (!Array.isArray(player.checkIns)) {
-        player.checkIns = [];
-      }
-
-      const existing = player.checkIns.find(
-        x => x.eventId === (p.eventId || "")
-      );
-
-      const record = {
-        eventId: p.eventId || "",
-        status: p.status || "Present",
-        updatedAt: now
-      };
-
-      if (existing) {
-        Object.assign(existing, record);
-      } else {
-        player.checkIns.push(record);
-      }
-
-      break;
-    }
-
-    case "bulkCheckin": {
-      for (const player of state.players) {
-        if (!(p.playerIds || []).includes(player.id)) continue;
-
-        if (!Array.isArray(player.checkIns)) {
-          player.checkIns = [];
-        }
-
-        const eventId = p.eventId || "";
-
-        const existing = player.checkIns.find(
-          x => x.eventId === eventId
-        );
-
-        const record = {
-          eventId,
-          status: p.status || "Present",
-          updatedAt: now
-        };
-
-        if (existing) {
-          Object.assign(existing, record);
-        } else {
-          player.checkIns.push(record);
-        }
-      }
-
-      break;
-    }
-
-    case "addEvent":
-      state.events.push({
-        id: id(),
-        title: String(p.title || "New event"),
-        description: String(p.description || ""),
-        startAt: p.startAt || null,
-        status: p.status || "Upcoming",
-        published: p.published !== false
-      });
-      break;
-
-    case "updateEvent": {
-      const event = findRecord(state.events, p.id, "Event");
-
-      Object.assign(event, p, { id: event.id });
-      break;
-    }
-
-    case "deleteEvent": {
-      const event = findRecord(state.events, p.id, "Event");
-
-      moveToRecycleBin(state, "event", event);
-      state.events = state.events.filter(x => x.id !== p.id);
-
-      break;
-    }
-
-    case "addMatch":
-      state.matches.push({
-        id: id(),
-        title: String(p.title || "New match"),
-        eventId: p.eventId || "",
-        teamIds: Array.isArray(p.teamIds) ? p.teamIds : [],
-        status: "Scheduled",
-        winnerTeamId: null,
-        scheduledAt: p.scheduledAt || null,
-        published: p.published !== false
-      });
-      break;
-
-    case "updateMatch": {
-      const match = findRecord(state.matches, p.id, "Match");
-
-      Object.assign(match, p, { id: match.id });
-      break;
-    }
-
-    case "completeMatch": {
-      const match = findRecord(
-        state.matches,
-        p.matchId,
-        "Match"
-      );
-
-      const winner = findRecord(
-        state.teams,
-        p.winnerTeamId,
-        "Winning team"
-      );
-
-      if (match.status !== "Completed" &&
-          match.status !== "completed") {
-        winner.wins = Number(winner.wins || 0) + 1;
-        winner.points = Number(winner.points || 0) + 10;
-
-        for (const playerId of winner.memberIds || []) {
+        ids.forEach(playerId => {
           const player = state.players.find(x => x.id === playerId);
 
-          if (player) {
-            player.points = Number(player.points || 0) + 10;
+          if (player.teamId) {
+            const previousTeam = state.teams.find(
+              entry => entry.id === player.teamId
+            );
+
+            if (previousTeam) {
+              previousTeam.memberIds = (previousTeam.memberIds || [])
+                .filter(existingId => existingId !== playerId);
+            }
+          }
+
+          player.teamId = team.id;
+        });
+      }
+
+      break;
+    }
+
+    case 'bulkAssignTeam': {
+      const team = p.teamId
+        ? findById(state.teams, p.teamId, 'Team')
+        : null;
+
+      const ids = Array.isArray(p.playerIds) ? p.playerIds : [];
+
+      ids.forEach(playerId => {
+        const player = state.players.find(x => x.id === playerId);
+
+        if (!player) {
+          return;
+        }
+
+        if (player.teamId) {
+          const old = state.teams.find(
+            entry => entry.id === player.teamId
+          );
+
+          if (old) {
+            old.memberIds = (old.memberIds || [])
+              .filter(x => x !== playerId);
           }
         }
-      }
 
-      match.status = "Completed";
-      match.winnerTeamId = winner.id;
-      match.completedAt = now;
+        player.teamId = team?.id || null;
 
-      break;
-    }
+        if (team) {
+          team.memberIds ||= [];
 
-    case "deleteMatch": {
-      const match = findRecord(state.matches, p.id || p.matchId, "Match");
-
-      moveToRecycleBin(state, "match", match);
-      state.matches = state.matches.filter(x => x.id !== match.id);
-
-      break;
-    }
-
-    case "awardPoints": {
-      const player = findRecord(state.players, p.playerId, "Participant");
-      const amount = Number(p.amount);
-
-      if (!Number.isFinite(amount)) {
-        throw new Error("Invalid points amount.");
-      }
-
-      player.points = Number(player.points || 0) + amount;
-      break;
-    }
-
-    case "addAchievement": {
-      const player = findRecord(state.players, p.playerId, "Participant");
-
-      if (!Array.isArray(player.achievements)) {
-        player.achievements = [];
-      }
-
-      player.achievements.push(
-        String(p.achievement || p.name || "Achievement")
-      );
-
-      break;
-    }
-
-    case "addChallenge":
-      state.challenges.push({
-        id: id(),
-        title: String(p.title || "Bonus challenge"),
-        description: String(p.description || ""),
-        points: Number(p.points || 0),
-        achievement: String(p.achievement || ""),
-        published: Boolean(p.published),
-        completedBy: []
-      });
-      break;
-
-    case "completeChallenge": {
-      const challenge = findRecord(
-        state.challenges,
-        p.challengeId,
-        "Challenge"
-      );
-
-      const player = findRecord(
-        state.players,
-        p.playerId,
-        "Participant"
-      );
-
-      challenge.completedBy = challenge.completedBy || [];
-
-      if (!challenge.completedBy.includes(player.id)) {
-        challenge.completedBy.push(player.id);
-
-        player.points =
-          Number(player.points || 0) +
-          Number(challenge.points || 0);
-
-        if (challenge.achievement) {
-          player.achievements = player.achievements || [];
-          player.achievements.push(challenge.achievement);
+          if (!team.memberIds.includes(playerId)) {
+            team.memberIds.push(playerId);
+          }
         }
+      });
+
+      break;
+    }
+
+    case 'checkin': {
+      const player = findById(state.players, p.playerId, 'Participant');
+
+      findById(state.events, p.eventId, 'Event');
+
+      player.checkIns = Array.isArray(player.checkIns)
+        ? player.checkIns
+        : [];
+
+      const entry = {
+        eventId: p.eventId,
+        status: text(p.status || 'Present', 30),
+        timestamp: now
+      };
+
+      const index = player.checkIns.findIndex(
+        x => x.eventId === p.eventId
+      );
+
+      if (index >= 0) {
+        player.checkIns[index] = entry;
+      } else {
+        player.checkIns.push(entry);
       }
 
       break;
     }
 
-    case "deleteChallenge": {
-      const challenge = findRecord(
-        state.challenges,
-        p.challengeId || p.id,
-        "Challenge"
-      );
+    case 'bulkCheckin': {
+      findById(state.events, p.eventId, 'Event');
 
-      moveToRecycleBin(state, "challenge", challenge);
+      const ids = Array.isArray(p.playerIds) ? p.playerIds : [];
 
-      state.challenges = state.challenges.filter(
-        x => x.id !== challenge.id
-      );
+      ids.forEach(playerId => {
+        const player = state.players.find(x => x.id === playerId);
+
+        if (!player) {
+          return;
+        }
+
+        player.checkIns ||= [];
+
+        const entry = {
+          eventId: p.eventId,
+          status: text(p.status || 'Present', 30),
+          timestamp: now
+        };
+
+        const index = player.checkIns.findIndex(
+          x => x.eventId === p.eventId
+        );
+
+        if (index >= 0) {
+          player.checkIns[index] = entry;
+        } else {
+          player.checkIns.push(entry);
+        }
+      });
 
       break;
     }
 
-    case "addAnnouncement":
-      state.announcements.push({
+    case 'addEvent':
+      state.events.push({
         id: id(),
-        title: String(p.title || "Announcement"),
-        body: String(p.body || ""),
-        published: Boolean(p.published),
+        title: text(p.title, 100),
+        description: text(p.description, 1000),
+        startAt: p.startAt || null,
+        status: text(p.status || 'Upcoming', 40),
+        published: p.published !== false,
         createdAt: now
       });
       break;
 
-    case "updateAnnouncement": {
-      const announcement = findRecord(
-        state.announcements,
-        p.id,
-        "Announcement"
-      );
+    case 'updateEvent': {
+      const event = findById(state.events, p.id, 'Event');
 
-      Object.assign(announcement, p, { id: announcement.id });
-      break;
-    }
-
-    case "deleteAnnouncement": {
-      const announcement = findRecord(
-        state.announcements,
-        p.id,
-        "Announcement"
-      );
-
-      moveToRecycleBin(state, "announcement", announcement);
-
-      state.announcements = state.announcements.filter(
-        x => x.id !== p.id
-      );
+      ['title', 'description', 'startAt', 'status', 'published']
+        .forEach(key => {
+          if (p[key] !== undefined) {
+            event[key] = key === 'published'
+              ? bool(p[key])
+              : key === 'description'
+                ? text(p[key], 1000)
+                : text(p[key], 100);
+          }
+        });
 
       break;
     }
 
-    case "bulkPublishAnnouncements": {
-      for (const announcement of state.announcements) {
-        if ((p.ids || []).includes(announcement.id)) {
-          announcement.published = Boolean(p.published);
-        }
+    case 'deleteEvent': {
+      const index = state.events.findIndex(x => x.id === p.id);
+
+      if (index < 0) {
+        throw new Error('Event not found.');
+      }
+
+      pushRecycle(state, 'event', state.events.splice(index, 1)[0]);
+
+      break;
+    }
+
+    case 'addMatch':
+      state.matches.push({
+        id: id(),
+        title: text(p.title, 100),
+        eventId: p.eventId || null,
+        teamIds: Array.isArray(p.teamIds) ? p.teamIds : [],
+        status: 'Scheduled',
+        winnerTeamId: null,
+        scheduledAt: p.scheduledAt || null,
+        published: p.published !== false,
+        createdAt: now
+      });
+      break;
+
+    case 'updateMatch': {
+      const match = findById(state.matches, p.id, 'Match');
+
+      ['title', 'eventId', 'scheduledAt', 'published', 'status']
+        .forEach(key => {
+          if (p[key] !== undefined) {
+            match[key] = p[key];
+          }
+        });
+
+      if (p.teamIds) {
+        match.teamIds = p.teamIds;
       }
 
       break;
     }
 
-    case "bulkDeleteAnnouncements": {
-      const ids = p.ids || [];
+    case 'completeMatch': {
+      const match = findById(state.matches, p.matchId, 'Match');
 
-      for (const announcementId of ids) {
-        const announcement = state.announcements.find(
-          x => x.id === announcementId
+      if (match.status === 'Completed' || match.pointsAwarded) {
+        throw new Error(
+          'This match has already been completed. Points cannot be awarded twice.'
+        );
+      }
+
+      const winnerTeamId = p.winnerTeamId || null;
+
+      if (winnerTeamId) {
+        const winner = findById(
+          state.teams,
+          winnerTeamId,
+          'Winning team'
         );
 
-        if (announcement) {
-          moveToRecycleBin(state, "announcement", announcement);
+        if (
+          Array.isArray(match.teamIds) &&
+          match.teamIds.length &&
+          !match.teamIds.includes(winner.id)
+        ) {
+          throw new Error(
+            'The winning team is not assigned to this match.'
+          );
         }
       }
 
-      state.announcements = state.announcements.filter(
-        x => !ids.includes(x.id)
+      match.status = 'Completed';
+      match.winnerTeamId = winnerTeamId;
+      match.completedAt = now;
+      match.pointsAwarded = p.awardPoints !== false && !!winnerTeamId;
+
+      if (match.pointsAwarded) {
+        const team = state.teams.find(
+          entry => entry.id === winnerTeamId
+        );
+
+        if (team) {
+          team.wins = num(team.wins) + 1;
+          team.points = num(team.points) + 10;
+
+          (team.memberIds || []).forEach(playerId => {
+            const player = state.players.find(
+              entry => entry.id === playerId
+            );
+
+            if (player) {
+              player.points = num(player.points) + 10;
+            }
+          });
+        }
+      }
+
+      break;
+    }
+
+    case 'deleteMatch': {
+      const index = state.matches.findIndex(x => x.id === p.id);
+
+      if (index < 0) {
+        throw new Error('Match not found.');
+      }
+
+      pushRecycle(state, 'match', state.matches.splice(index, 1)[0]);
+
+      break;
+    }
+
+    case 'awardPoints': {
+      const player = findById(
+        state.players,
+        p.playerId,
+        'Participant'
+      );
+
+      player.points = num(player.points) + num(p.amount);
+
+      break;
+    }
+
+    case 'bulkAwardPoints': {
+      const ids = Array.isArray(p.playerIds) ? p.playerIds : [];
+
+      ids.forEach(playerId => {
+        const player = state.players.find(x => x.id === playerId);
+
+        if (player) {
+          player.points = num(player.points) + num(p.amount);
+        }
+      });
+
+      break;
+    }
+
+    case 'bulkPlayerStatus': {
+      const ids = Array.isArray(p.playerIds) ? p.playerIds : [];
+
+      ids.forEach(playerId => {
+        const player = state.players.find(x => x.id === playerId);
+
+        if (player) {
+          player.status = text(p.status, 40);
+        }
+      });
+
+      break;
+    }
+
+    case 'bulkDeletePlayers': {
+      const ids = new Set(p.playerIds || []);
+
+      state.players = state.players.filter(player => {
+        if (!ids.has(player.id)) {
+          return true;
+        }
+
+        pushRecycle(state, 'player', player);
+
+        state.teams.forEach(team => {
+          team.memberIds = (team.memberIds || [])
+            .filter(x => x !== player.id);
+        });
+
+        return false;
+      });
+
+      break;
+    }
+
+    case 'addAchievement': {
+      const player = findById(
+        state.players,
+        p.playerId,
+        'Participant'
+      );
+
+      player.achievements ||= [];
+
+      player.achievements.push({
+        id: id(),
+        name: text(p.name, 80),
+        createdAt: now
+      });
+
+      break;
+    }
+
+    case 'addChallenge':
+      state.challenges.push({
+        id: id(),
+        title: text(p.title, 100),
+        description: text(p.description, 1000),
+        points: num(p.points),
+        achievement: text(p.achievement, 80),
+        published: bool(p.published),
+        completedBy: [],
+        createdAt: now
+      });
+      break;
+
+    case 'completeChallenge': {
+      const challenge = findById(
+        state.challenges,
+        p.challengeId,
+        'Challenge'
+      );
+
+      const player = findById(
+        state.players,
+        p.playerId,
+        'Participant'
+      );
+
+      challenge.completedBy ||= [];
+
+      if (!challenge.completedBy.includes(player.id)) {
+        challenge.completedBy.push(player.id);
+        player.points = num(player.points) + num(challenge.points);
+
+        if (challenge.achievement) {
+          player.achievements ||= [];
+
+          player.achievements.push({
+            id: id(),
+            name: challenge.achievement,
+            createdAt: now
+          });
+        }
+      }
+
+      break;
+    }
+
+    case 'deleteChallenge': {
+      const index = state.challenges.findIndex(x => x.id === p.id);
+
+      if (index < 0) {
+        throw new Error('Challenge not found.');
+      }
+
+      pushRecycle(
+        state,
+        'challenge',
+        state.challenges.splice(index, 1)[0]
       );
 
       break;
     }
 
-    case "publishWinner": {
-      const team = findRecord(state.teams, p.teamId, "Team");
+    case 'addAnnouncement':
+      state.announcements.push({
+        id: id(),
+        title: text(p.title, 100),
+        body: text(p.body, 3000),
+        published: bool(p.published),
+        createdAt: now
+      });
+      break;
+
+    case 'updateAnnouncement': {
+      const announcement = findById(
+        state.announcements,
+        p.id,
+        'Announcement'
+      );
+
+      ['title', 'body', 'published'].forEach(key => {
+        if (p[key] !== undefined) {
+          announcement[key] = key === 'published'
+            ? bool(p[key])
+            : text(p[key], 3000);
+        }
+      });
+
+      break;
+    }
+
+    case 'deleteAnnouncement': {
+      const index = state.announcements.findIndex(x => x.id === p.id);
+
+      if (index < 0) {
+        throw new Error('Announcement not found.');
+      }
+
+      pushRecycle(
+        state,
+        'announcement',
+        state.announcements.splice(index, 1)[0]
+      );
+
+      break;
+    }
+
+    case 'bulkPublishAnnouncements': {
+      const ids = new Set(p.ids || []);
+
+      state.announcements.forEach(announcement => {
+        if (ids.has(announcement.id)) {
+          announcement.published = bool(p.published);
+        }
+      });
+
+      break;
+    }
+
+    case 'bulkDeleteAnnouncements': {
+      const ids = new Set(p.ids || []);
+
+      state.announcements = state.announcements.filter(announcement => {
+        if (!ids.has(announcement.id)) {
+          return true;
+        }
+
+        pushRecycle(state, 'announcement', announcement);
+
+        return false;
+      });
+
+      break;
+    }
+
+    case 'publishWinner': {
+      const team = findById(state.teams, p.teamId, 'Winning team');
 
       state.winner = {
         id: id(),
         teamId: team.id,
         teamName: team.name,
-        message: String(p.message || "Congratulations!"),
-        publishedAt: now,
-        published: true
+        message: text(p.message, 1000),
+        published: true,
+        publishedAt: now
       };
-
-      state.history.unshift({
-        id: id(),
-        teamId: team.id,
-        teamName: team.name,
-        title: "Nerolympics Champion",
-        date: now
-      });
 
       state.hallOfFame.unshift({
         id: id(),
         teamId: team.id,
         teamName: team.name,
-        date: now
+        message: state.winner.message,
+        publishedAt: now
       });
 
       break;
     }
 
-    case "clearWinner":
+    case 'clearWinner':
       state.winner = null;
       break;
 
-    case "selectMvp": {
-      const player = findRecord(
+    case 'selectMvp': {
+      const player = findById(
         state.players,
         p.playerId,
-        "Participant"
+        'MVP participant'
       );
 
       state.settings.mvp = {
         playerId: player.id,
-        message: String(p.message || ""),
-        published: Boolean(p.published),
-        publishedAt: p.published ? now : null
+        message: text(p.message, 1000),
+        published: false,
+        publishedAt: null
       };
 
       break;
     }
 
-    case "addPrize": {
-      const player = state.players.find(x => x.id === p.playerId);
+    case 'publishMvp': {
+      if (!state.settings.mvp.playerId) {
+        throw new Error('Select an MVP first.');
+      }
+
+      state.settings.mvp.published = true;
+      state.settings.mvp.publishedAt = now;
+
+      break;
+    }
+
+    case 'addPrize': {
+      const player = findById(
+        state.players,
+        p.playerId,
+        'Participant'
+      );
 
       state.prizes.push({
         id: id(),
-        playerId: p.playerId || "",
-        playerName: player
-          ? player.roblox
-          : String(p.playerName || ""),
-        reward: String(p.reward || ""),
-        delivered: false,
-        public: Boolean(p.public)
+        playerId: player.id,
+        playerName: player.roblox,
+        reward: text(p.reward, 150),
+        delivered: bool(p.delivered),
+        public: bool(p.public),
+        createdAt: now
       });
 
       break;
     }
 
-    case "updatePrize": {
-      const prize = findRecord(state.prizes, p.id, "Prize");
+    case 'updatePrize': {
+      const prize = findById(state.prizes, p.id, 'Prize');
 
-      Object.assign(prize, p, { id: prize.id });
+      ['reward', 'delivered', 'public'].forEach(key => {
+        if (p[key] !== undefined) {
+          prize[key] = ['delivered', 'public'].includes(key)
+            ? bool(p[key])
+            : text(p[key], 150);
+        }
+      });
+
       break;
     }
 
-    case "deletePrize": {
-      const prize = findRecord(
-        state.prizes,
-        p.id || p.prizeId,
-        "Prize"
+    case 'deletePrize': {
+      const index = state.prizes.findIndex(x => x.id === p.id);
+
+      if (index < 0) {
+        throw new Error('Prize not found.');
+      }
+
+      pushRecycle(state, 'prize', state.prizes.splice(index, 1)[0]);
+
+      break;
+    }
+
+    case 'bulkPrizeDelivered': {
+      const ids = new Set(p.ids || []);
+
+      state.prizes.forEach(prize => {
+        if (ids.has(prize.id)) {
+          prize.delivered = bool(p.delivered);
+        }
+      });
+
+      break;
+    }
+
+    case 'bulkDeleteTeams': {
+      const ids = new Set(p.ids || []);
+
+      state.teams = state.teams.filter(team => {
+        if (!ids.has(team.id)) {
+          return true;
+        }
+
+        pushRecycle(state, 'team', team);
+
+        state.players.forEach(player => {
+          if (player.teamId === team.id) {
+            player.teamId = null;
+          }
+        });
+
+        return false;
+      });
+
+      break;
+    }
+
+    case 'restoreRecycleItem': {
+      const index = state.recycleBin.findIndex(
+        item => item.id === p.id
       );
 
-      moveToRecycleBin(state, "prize", prize);
-
-      state.prizes = state.prizes.filter(x => x.id !== prize.id);
-      break;
-    }
-
-    case "bulkPrizeDelivered": {
-      for (const prize of state.prizes) {
-        if ((p.ids || []).includes(prize.id)) {
-          prize.delivered = Boolean(p.delivered);
-        }
+      if (index < 0) {
+        throw new Error('Recycle Bin item not found.');
       }
+
+      restoreRecycleRecord(state, index);
 
       break;
     }
 
-    case "restoreRecycleItem":
-      restoreRecycleRecord(state, p.id);
-      break;
+    case 'bulkRestoreRecycleItems': {
+      const ids = [
+        ...new Set(Array.isArray(p.ids) ? p.ids : [])
+      ];
 
-    case "bulkRestoreRecycleItems":
-      for (const recycleId of p.ids || p.recycleIds || []) {
-        restoreRecycleRecord(state, recycleId);
+      if (!ids.length) {
+        throw new Error(
+          'Select at least one Recycle Bin item to restore.'
+        );
       }
-      break;
 
-    case "permanentDeleteRecycleItem": {
+      const indexes = ids.map(itemId =>
+        state.recycleBin.findIndex(item => item.id === itemId)
+      );
+
+      if (indexes.some(index => index < 0)) {
+        throw new Error(
+          'One or more selected Recycle Bin items could not be found. Refresh and try again.'
+        );
+      }
+
+      indexes
+        .sort((a, b) => b - a)
+        .forEach(index => restoreRecycleRecord(state, index));
+
+      break;
+    }
+
+    case 'permanentDeleteRecycleItem': {
       const index = state.recycleBin.findIndex(x => x.id === p.id);
 
-      if (index === -1) {
-        throw new Error("Recycle Bin record not found.");
+      if (index < 0) {
+        throw new Error('Recycle Bin item not found.');
       }
 
       state.recycleBin.splice(index, 1);
-      break;
-    }
-
-    case "bulkPermanentDeleteRecycleItems": {
-      const ids = p.ids || [];
-
-      state.recycleBin = state.recycleBin.filter(
-        x => !ids.includes(x.id)
-      );
 
       break;
     }
 
-    case "emptyRecycleBin":
+    case 'emptyRecycleBin':
       state.recycleBin = [];
       break;
 
-    case "updatePermissions": {
-      const incoming = p.permissions || {};
+    case 'updatePermissions': {
+      const next = p.permissions || {};
 
-      for (const key of Object.keys(DEFAULT_PERMISSIONS)) {
-        if (typeof incoming[key] === "boolean") {
-          state.settings.staffPermissions[key] = incoming[key];
+      Object.keys(DEFAULT_PERMISSIONS).forEach(key => {
+        if (typeof next[key] === 'boolean') {
+          state.settings.staffPermissions[key] = next[key];
         }
-      }
-
-      break;
-    }
-
-    case "setMaintenance":
-      state.settings.maintenanceMode = Boolean(p.enabled);
-      state.settings.maintenanceMessage = String(
-        p.message || DEFAULT_STATE.settings.maintenanceMessage
-      );
-      break;
-
-    case "undo": {
-      const previous = state.versions[0];
-
-      if (!previous) {
-        throw new Error("There is no previous version to restore.");
-      }
-
-      const restored = cleanState(previous.snapshot);
-
-      state.players = restored.players;
-      state.teams = restored.teams;
-      state.events = restored.events;
-      state.matches = restored.matches;
-      state.challenges = restored.challenges;
-      state.announcements = restored.announcements;
-      state.prizes = restored.prizes;
-      state.recycleBin = restored.recycleBin;
-      state.settings = restored.settings;
-      state.winner = restored.winner;
-      state.history = restored.history;
-      state.hallOfFame = restored.hallOfFame;
-
-      break;
-    }
-
-    case "restoreVersion": {
-      const version = findRecord(
-        state.versions,
-        p.versionId,
-        "Version"
-      );
-
-      const restored = cleanState(version.snapshot);
-
-      state.players = restored.players;
-      state.teams = restored.teams;
-      state.events = restored.events;
-      state.matches = restored.matches;
-      state.challenges = restored.challenges;
-      state.announcements = restored.announcements;
-      state.prizes = restored.prizes;
-      state.recycleBin = restored.recycleBin;
-      state.settings = restored.settings;
-      state.winner = restored.winner;
-      state.history = restored.history;
-      state.hallOfFame = restored.hallOfFame;
-
-      break;
-    }
-
-    case "createBackup": {
-      state.backups.unshift({
-        id: id(),
-        createdAt: now,
-        summary: "Manual backup",
-        data: clone({
-          ...state,
-          versions: [],
-          activityLog: [],
-          backups: []
-        })
       });
 
-      state.backups = state.backups.slice(0, BACKUP_LIMIT);
       break;
     }
 
-    case "importBackup": {
-      const backup = p.backup;
-
-      if (!validateBackup(backup)) {
-        throw new Error("The selected backup is invalid.");
-      }
-
-      const incoming = cleanState(
-        backup.data || backup.state || backup
+    case 'setMaintenance':
+      state.settings.maintenanceMode = bool(p.enabled);
+      state.settings.maintenanceMessage = text(
+        p.message || state.settings.maintenanceMessage,
+        1000
       );
-
-      state.players = incoming.players;
-      state.teams = incoming.teams;
-      state.events = incoming.events;
-      state.matches = incoming.matches;
-      state.challenges = incoming.challenges;
-      state.announcements = incoming.announcements;
-      state.prizes = incoming.prizes;
-      state.recycleBin = incoming.recycleBin;
-      state.settings = incoming.settings;
-      state.winner = incoming.winner;
-      state.history = incoming.history;
-      state.hallOfFame = incoming.hallOfFame;
-
       break;
-    }
 
     default:
-      throw new Error("Unknown action: " + type);
+      throw new Error(`Unknown action: ${type}`);
   }
-
-  return state;
 }
 
-app.post("/api/staff/action", requireStaff, async (req, res) => {
-  const type = req.body?.type;
-  const payload = req.body?.payload || {};
-  const role = req.session.role;
+async function mutate(req, res, type, payload = {}) {
+  const client = await pool.connect();
 
-  if (!type || typeof type !== "string") {
-    return res.status(400).json({
-      error: "An action type is required."
+  try {
+    await client.query('BEGIN');
+
+    const state = await getState(client);
+
+    if (!checkPermission(state, req.session.role, type)) {
+      throw Object.assign(
+        new Error(
+          'Your staff account does not have permission to perform this action.'
+        ),
+        { status: 403 }
+      );
+    }
+
+    const summary = summaryFor(type, payload);
+
+    takeSnapshot(state, summary);
+
+    await performAction(state, type, payload);
+
+    logActivity(state, summary, type);
+
+    await client.query(
+      'INSERT INTO automatic_backups(data) VALUES($1::jsonb)',
+      [
+        JSON.stringify({
+          app: 'nerolympics',
+          schemaVersion: SCHEMA_VERSION,
+          exportedAt: new Date().toISOString(),
+          data: state
+        })
+      ]
+    );
+
+    await client.query(
+      `DELETE FROM automatic_backups
+       WHERE id NOT IN (
+         SELECT id FROM automatic_backups
+         ORDER BY created_at DESC
+         LIMIT $1
+       )`,
+      [BACKUP_LIMIT]
+    );
+
+    await saveState(state, client);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      state: req.session.role === 'admin' ? state : undefined
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    res.status(error.status || 400).json({
+      error: error.message || 'Action failed.'
+    });
+  } finally {
+    client.release();
+  }
+}
+
+function maintenancePage(message) {
+  const safe = String(
+    message || DEFAULT_STATE.settings.maintenanceMessage
+  ).replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maintenance | The Nerolympics</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080b12;color:#f5f7fb;font-family:Arial,sans-serif;padding:24px}
+.card{max-width:650px;text-align:center;padding:48px 32px;border:1px solid #273246;border-radius:24px;background:#111827;box-shadow:0 25px 80px #0008}
+small{color:#91a0b7;letter-spacing:.2em}
+h1{font-size:clamp(2rem,7vw,4rem);margin:18px 0}
+p{color:#aab6c8;line-height:1.7}
+</style>
+</head>
+<body>
+<main class="card">
+<small>THE NEROLYMPICS</small>
+<h1>We'll be back soon.</h1>
+<p>${safe}</p>
+</main>
+</body>
+</html>`;
+}
+
+app.get('/health', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'nerolympics'
+  });
+});
+
+app.get('/staff', (req, res) => {
+  res.sendFile(path.join(publicDir, 'staff.html'));
+});
+
+app.get('/', async (req, res) => {
+  try {
+    const state = await getState();
+
+    if (state.settings.maintenanceMode) {
+      return res.status(503).send(
+        maintenancePage(state.settings.maintenanceMessage)
+      );
+    }
+  } catch (error) {
+    console.error('Maintenance check failed:', error.message);
+  }
+
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
+
+app.get('/api/public/state', async (req, res) => {
+  try {
+    const state = await getState();
+
+    if (state.settings.maintenanceMode) {
+      return res.status(503).json({
+        maintenance: true,
+        message: state.settings.maintenanceMessage
+      });
+    }
+
+    res.json(publicState(state));
+  } catch (error) {
+    res.status(500).json({
+      error: 'Could not load event data.'
+    });
+  }
+});
+
+app.post('/api/staff/login', async (req, res) => {
+  const username = text(req.body.username, 100);
+  const password = String(req.body.password || '');
+
+  const safeEqual = (a, b) => {
+    const aa = Buffer.from(String(a));
+    const bb = Buffer.from(String(b));
+
+    return aa.length === bb.length &&
+      crypto.timingSafeEqual(aa, bb);
+  };
+
+  let role = null;
+
+  if (
+    safeEqual(username, process.env.ADMIN_USERNAME) &&
+    safeEqual(password, process.env.ADMIN_PASSWORD)
+  ) {
+    role = 'admin';
+  } else if (
+    safeEqual(username, process.env.STAFF_USERNAME) &&
+    safeEqual(password, process.env.STAFF_PASSWORD)
+  ) {
+    role = 'staff';
+  }
+
+  if (!role) {
+    return res.status(401).json({
+      error: 'Incorrect username or password.'
     });
   }
 
-  if (ADMIN_ONLY_ACTIONS.has(type) && role !== "admin") {
-    return res.status(403).json({
-      error: "Administrator access required for this action."
+  req.session.regenerate(error => {
+    if (error) {
+      return res.status(500).json({
+        error: 'Could not start session.'
+      });
+    }
+
+    req.session.role = role;
+
+    req.session.save(() => {
+      res.json({
+        success: true,
+        role
+      });
     });
+  });
+});
+
+app.post('/api/staff/logout', requireStaff, (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/staff/me', (req, res) => {
+  res.json({
+    authenticated: !!req.session?.role,
+    role: req.session?.role || null
+  });
+});
+
+app.get('/api/staff/state', requireStaff, async (req, res) => {
+  try {
+    const state = await getState();
+
+    if (req.session.role === 'staff') {
+      state.versions = [];
+      state.backups = [];
+    }
+
+    res.json(state);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Could not load staff data.'
+    });
+  }
+});
+
+app.post('/api/staff/action', requireStaff, async (req, res) => {
+  const { type, payload } = req.body || {};
+
+  if (typeof type !== 'string') {
+    return res.status(400).json({
+      error: 'Action type is required.'
+    });
+  }
+
+  if (
+    type === 'restoreVersion' ||
+    type === 'undo' ||
+    type === 'importBackup' ||
+    type === 'createBackup' ||
+    type === 'updatePermissions' ||
+    type === 'setMaintenance' ||
+    type === 'permanentDeleteRecycleItem' ||
+    type === 'emptyRecycleBin'
+  ) {
+    if (req.session.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Admin access required.'
+      });
+    }
+
+    if (type === 'restoreVersion' || type === 'undo') {
+      return restoreVersion(req, res, type, payload || {});
+    }
+
+    if (type === 'importBackup') {
+      return importBackup(req, res, payload || {});
+    }
+
+    if (type === 'createBackup') {
+      return createBackup(req, res);
+    }
+
+    if (type === 'updatePermissions' || type === 'setMaintenance') {
+      return mutate(
+        req,
+        res,
+        type === 'updatePermissions'
+          ? 'updatePermissions'
+          : 'setMaintenance',
+        payload || {}
+      );
+    }
+
+    if (
+      type === 'permanentDeleteRecycleItem' ||
+      type === 'emptyRecycleBin'
+    ) {
+      return mutate(req, res, type, payload || {});
+    }
+  }
+
+  return mutate(req, res, type, payload || {});
+});
+
+async function restoreVersion(req, res, type, payload) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const state = await getState(client);
+
+    let version;
+
+    if (type === 'undo') {
+      version = state.versions[0];
+    } else {
+      version = state.versions.find(
+        entry => entry.id === payload.versionId
+      );
+    }
+
+    if (!version) {
+      throw new Error('Version not found.');
+    }
+
+    takeSnapshot(
+      state,
+      type === 'undo'
+        ? 'Before undo'
+        : 'Before version restore'
+    );
+
+    const restored = normalizeState(version.snapshot);
+
+    restored.versions = state.versions;
+    restored.activityLog = state.activityLog;
+    restored.recycleBin = state.recycleBin;
+    restored.backups = state.backups;
+
+    logActivity(
+      restored,
+      type === 'undo'
+        ? 'Undid the latest change'
+        : 'Restored a previous version',
+      type
+    );
+
+    await saveState(restored, client);
+
+    await client.query('COMMIT');
+
+    res.json({ success: true });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+
+    res.status(400).json({
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+}
+
+async function createBackup(req, res) {
+  try {
+    const state = await getState();
+
+    const data = {
+      app: 'nerolympics',
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      data: state
+    };
+
+    await pool.query(
+      'INSERT INTO automatic_backups(data) VALUES($1::jsonb)',
+      [JSON.stringify(data)]
+    );
+
+    await pool.query(
+      `DELETE FROM automatic_backups
+       WHERE id NOT IN (
+         SELECT id FROM automatic_backups
+         ORDER BY created_at DESC
+         LIMIT $1
+       )`,
+      [BACKUP_LIMIT]
+    );
+
+    res.json({
+      success: true,
+      backup: data
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Backup failed.'
+    });
+  }
+}
+
+async function importBackup(req, res, payload) {
+  const body = payload.backup;
+
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    Number(body.schemaVersion || 1) > SCHEMA_VERSION
+  ) {
+    return res.status(400).json({
+      error: 'This backup is invalid or uses an unsupported version.'
+    });
+  }
+
+  // Accept both this app's export wrapper and older plain-state JSON backups.
+  const raw = body.data || body.state || body;
+
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    Array.isArray(raw)
+  ) {
+    return res.status(400).json({
+      error: 'Backup data is missing or invalid.'
+    });
+  }
+
+  for (const key of [
+    'players',
+    'teams',
+    'events',
+    'matches',
+    'challenges',
+    'announcements',
+    'prizes'
+  ]) {
+    if (!Array.isArray(raw[key])) {
+      return res.status(400).json({
+        error: `Backup validation failed: ${key} must be an array.`
+      });
+    }
   }
 
   const client = await pool.connect();
 
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
-    const result = await client.query(
-      "SELECT data FROM event_state WHERE id = 1 FOR UPDATE"
+    const current = await getState(client);
+
+    takeSnapshot(current, 'Before backup import');
+
+    const restored = normalizeState(raw);
+
+    restored.versions = current.versions;
+    restored.activityLog = current.activityLog;
+    restored.recycleBin = current.recycleBin;
+    restored.backups = current.backups;
+
+    logActivity(
+      restored,
+      'Imported a validated backup',
+      'importBackup'
     );
 
-    const state = cleanState(result.rows[0]?.data || DEFAULT_STATE);
+    await saveState(restored, client);
 
-    if (role !== "admin") {
-      const permission = permissionForAction(type);
-
-      if (state.settings.staffPermissions[permission] !== true) {
-        throw new Error("This action is disabled for standard staff.");
-      }
-    }
-
-    // Save a snapshot before changes, excluding administrative housekeeping.
-    if (!["createBackup"].includes(type)) {
-      createSnapshot(state, `Before: ${type}`);
-    }
-
-    await performAction(state, type, payload);
-
-    // Shared accounts only: never store a person's identity in the log.
-    addActivity(state, `Action completed: ${type}`);
-
-    await saveState(state, client);
-
-    await client.query("COMMIT");
+    await client.query('COMMIT');
 
     res.json({ success: true });
   } catch (error) {
-    await client.query("ROLLBACK");
-
-    console.error(error);
+    await client.query('ROLLBACK').catch(() => {});
 
     res.status(400).json({
-      error: error.message || "Action failed."
+      error: error.message
     });
   } finally {
     client.release();
   }
-});
+}
 
-app.get("/api/staff/analytics", requireStaff, async (req, res) => {
+app.get(
+  '/api/staff/backup',
+  requireStaff,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const state = await getState();
+
+      res.json({
+        app: 'nerolympics',
+        schemaVersion: SCHEMA_VERSION,
+        exportedAt: new Date().toISOString(),
+        data: state
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'Export failed.'
+      });
+    }
+  }
+);
+
+app.get('/api/staff/analytics', requireStaff, async (req, res) => {
   try {
     const state = await getState();
 
     const total = state.players.length;
 
-    const active = state.players.filter(
-      x => x.status !== "Disqualified"
-    ).length;
-
-    const checkedIn = state.players.filter(
-      x => (x.checkIns || []).some(c => c.status === "Present")
-    ).length;
-
-    const totalPoints = state.players.reduce(
-      (sum, player) => sum + Number(player.points || 0),
+    const checkins = state.players.reduce(
+      (count, player) =>
+        count + (player.checkIns || []).filter(
+          checkin =>
+            checkin.status === 'Present' ||
+            checkin.status === 'Late'
+        ).length,
       0
     );
 
-    const completedMatches = state.matches.filter(
-      x => x.status === "Completed" || x.status === "completed"
-    ).length;
+    const possible = state.players.length * state.events.length;
 
-    const teamStats = state.teams.map(team => ({
-      id: team.id,
-      name: team.name,
-      players: (team.memberIds || []).length,
-      points: Number(team.points || 0),
-      wins: Number(team.wins || 0)
-    }));
+    const teamStats = state.teams
+      .map(team => ({
+        id: team.id,
+        name: team.name,
+        players: (team.memberIds || []).length,
+        points: num(team.points),
+        wins: num(team.wins)
+      }))
+      .sort((a, b) => b.points - a.points);
 
     res.json({
       participants: total,
-      active,
-      participationRate: total
-        ? Math.round((checkedIn / total) * 100)
+      active: state.players.filter(
+        player => player.status !== 'Disqualified'
+      ).length,
+      participationRate: possible
+        ? Math.round(checkins / possible * 100)
         : 0,
-      totalPoints,
+      totalPoints: state.players.reduce(
+        (count, player) => count + num(player.points),
+        0
+      ),
       matches: state.matches.length,
-      completedMatches,
+      completedMatches: state.matches.filter(
+        match => match.status === 'Completed'
+      ).length,
       teamStats
     });
   } catch (error) {
-    console.error(error);
-
     res.status(500).json({
-      error: "Unable to load analytics."
+      error: 'Analytics unavailable.'
     });
   }
 });
 
-app.get("/api/staff/search", requireStaff, async (req, res) => {
+app.get('/api/staff/search', requireStaff, async (req, res) => {
   try {
-    const state = await getState();
-    const query = String(req.query.q || "").toLowerCase().trim();
+    const q = text(req.query.q, 100).toLowerCase();
 
-    if (!query) {
-      return res.json({ results: [] });
+    if (!q) {
+      return res.json([]);
     }
 
-    const collections = [
-      ["Participant", state.players, ["roblox", "discord"]],
-      ["Team", state.teams, ["name", "captain"]],
-      ["Event", state.events, ["title", "description"]],
-      ["Match", state.matches, ["title"]],
-      ["Challenge", state.challenges, ["title", "description"]],
-      ["Announcement", state.announcements, ["title", "body"]],
-      ["Prize", state.prizes, ["playerName", "reward"]]
+    const state = await getState();
+
+    const groups = [
+      [
+        'Participant',
+        state.players,
+        x => `${x.roblox} ${x.discord || ''}`
+      ],
+      [
+        'Team',
+        state.teams,
+        x => x.name
+      ],
+      [
+        'Event',
+        state.events,
+        x => `${x.title} ${x.description || ''}`
+      ],
+      [
+        'Match',
+        state.matches,
+        x => x.title
+      ],
+      [
+        'Announcement',
+        state.announcements,
+        x => `${x.title} ${x.body || ''}`
+      ],
+      [
+        'Prize',
+        state.prizes,
+        x => `${x.playerName} ${x.reward}`
+      ],
+      [
+        'Recycle Bin',
+        state.recycleBin,
+        x => `${x.type} ${x.record?.roblox || x.record?.name || x.record?.title || ''}`
+      ],
+      [
+        'Version History',
+        state.versions,
+        x => `${x.summary || ''}`
+      ],
+      [
+        'Activity Log',
+        state.activityLog,
+        x => `${x.summary || ''}`
+      ]
     ];
 
-    const results = [];
+    const out = [];
 
-    for (const [type, records, fields] of collections) {
-      for (const record of records) {
-        if (fields.some(field =>
-          String(record[field] || "").toLowerCase().includes(query)
-        )) {
-          results.push({
+    for (const [type, items, field] of groups) {
+      for (const item of items) {
+        if (field(item).toLowerCase().includes(q)) {
+          out.push({
             type,
-            id: record.id,
-            name:
-              record.roblox ||
-              record.name ||
-              record.title ||
-              record.playerName ||
-              type
+            id: item.id,
+            label:
+              item.roblox ||
+              item.name ||
+              item.title ||
+              item.reward ||
+              item.type,
+            detail:
+              type === 'Participant'
+                ? item.status
+                : type === 'Prize'
+                  ? item.playerName
+                  : ''
           });
         }
       }
     }
 
-    for (const item of state.recycleBin) {
-      const record = item.record || {};
+    res.json(out.slice(0, 60));
+  } catch (error) {
+    res.status(500).json({
+      error: 'Search failed.'
+    });
+  }
+});
 
-      const searchable = JSON.stringify(record).toLowerCase();
+app.get(
+  '/api/staff/backups',
+  requireStaff,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id,created_at
+         FROM automatic_backups
+         ORDER BY created_at DESC
+         LIMIT 30`
+      );
 
-      if (searchable.includes(query)) {
-        results.push({
-          type: `Recycle Bin: ${item.type}`,
-          id: item.id,
-          name:
-            record.roblox ||
-            record.name ||
-            record.title ||
-            item.type
-        });
-      }
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({
+        error: 'Could not load backups.'
+      });
     }
-
-    res.json({ results: results.slice(0, 100) });
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Search failed."
-    });
   }
-});
+);
 
-app.get("/api/staff/backup", requireStaff, requireAdmin, async (req, res) => {
-  try {
-    const state = await getState();
-
-    const backup = {
-      format: "nerolympics-backup",
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      data: state
-    };
-
-    res.json(backup);
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Backup export failed."
-    });
-  }
-});
-
-app.get("/api/staff/backups", requireStaff, requireAdmin, async (req, res) => {
-  try {
-    const state = await getState();
-
-    res.json(state.backups.map(backup => ({
-      id: backup.id,
-      createdAt: backup.createdAt,
-      summary: backup.summary
-    })));
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Unable to load backups."
-    });
-  }
-});
-
-app.post("/api/staff/restore", requireStaff, requireAdmin, async (req, res) => {
-  if (!validateBackup(req.body)) {
-    return res.status(400).json({
-      error: "Invalid backup file."
-    });
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      "SELECT data FROM event_state WHERE id = 1 FOR UPDATE"
-    );
-
-    const current = cleanState(result.rows[0]?.data || DEFAULT_STATE);
-
-    createSnapshot(current, "Before backup restoration");
-
-    const incoming = cleanState(
-      req.body.data || req.body.state || req.body
-    );
-
-    incoming.versions = current.versions;
-    incoming.activityLog = current.activityLog;
-    incoming.backups = current.backups;
-
-    addActivity(incoming, "Backup restored");
-
-    await saveState(incoming, client);
-
-    await client.query("COMMIT");
-
-    res.json({ success: true });
-  } catch (error) {
-    await client.query("ROLLBACK");
-
-    console.error(error);
-
-    res.status(500).json({
-      error: "Backup restore failed."
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// Automatic database backup every six hours while the server is running.
-async function automaticBackup() {
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      "SELECT data FROM event_state WHERE id = 1 FOR UPDATE"
-    );
-
-    const state = cleanState(result.rows[0]?.data || DEFAULT_STATE);
-
-    state.backups.unshift({
-      id: id(),
-      createdAt: new Date().toISOString(),
-      summary: "Automatic backup",
-      data: clone({
-        ...state,
-        versions: [],
-        activityLog: [],
-        backups: []
-      })
-    });
-
-    state.backups = state.backups.slice(0, BACKUP_LIMIT);
-
-    await saveState(state, client);
-
-    await client.query("COMMIT");
-
-    console.log("Automatic Nerolympics backup created.");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Automatic backup failed:", error);
-  } finally {
-    client.release();
-  }
-}
-
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    service: "Nerolympics"
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API route not found.'
   });
 });
 
 app.use((req, res) => {
-  res.status(404).send("Page not found.");
+  res.status(404).send('Page not found.');
 });
 
-initializeDatabase()
+app.use((error, req, res, next) => {
+  console.error(error);
+
+  if (res.headersSent) {
+    return next(error);
+  }
+
+  res.status(500).json({
+    error: 'Unexpected server error.'
+  });
+});
+
+initDb()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`Nerolympics running on port ${PORT}`);
+      console.log(`Nerolympics server listening on ${PORT}`);
     });
 
-    setInterval(automaticBackup, 6 * 60 * 60 * 1000);
+    // Backups run while the service is awake;
+    // the persistent database remains the source of truth.
+    setInterval(async () => {
+      try {
+        const state = await getState();
+
+        await pool.query(
+          'INSERT INTO automatic_backups(data) VALUES($1::jsonb)',
+          [
+            JSON.stringify({
+              app: 'nerolympics',
+              schemaVersion: SCHEMA_VERSION,
+              exportedAt: new Date().toISOString(),
+              data: state
+            })
+          ]
+        );
+
+        await pool.query(
+          `DELETE FROM automatic_backups
+           WHERE id NOT IN (
+             SELECT id FROM automatic_backups
+             ORDER BY created_at DESC
+             LIMIT $1
+           )`,
+          [BACKUP_LIMIT]
+        );
+      } catch (error) {
+        console.error(
+          'Scheduled backup failed:',
+          error.message
+        );
+      }
+    }, 6 * 60 * 60 * 1000).unref();
   })
   .catch(error => {
-    console.error("Database initialization failed:", error);
+    console.error('Database initialization failed:', error);
     process.exit(1);
   });
