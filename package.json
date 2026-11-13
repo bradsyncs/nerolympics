@@ -2,16 +2,18 @@
 {
   "name": "nerolympics",
   "version": "1.0.0",
-  "description": "The Nerolympics event website and staff management system",
+  "description": "Nerolympics event website and staff management system",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
   "dependencies": {
-    "express": "4.21.2",
-    "express-session": "1.18.1"
+    "connect-pg-simple": "^10.0.0",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "pg": "^8.16.3"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
