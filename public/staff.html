@@ -1,0 +1,1008 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090a10">
+<title>Nerolympics | Staff Control</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --bg:#090a10;
+  --panel:#12141e;
+  --panel2:#191c29;
+  --border:rgba(255,255,255,.09);
+  --text:#f4f4fa;
+  --muted:#969bad;
+  --accent:#bd94ff;
+  --green:#65d6a0;
+  --red:#ff727c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+#loginScreen{min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at top,rgba(151,95,255,.2),transparent 55%)}
+.login{width:min(420px,100%);background:var(--panel);border:1px solid var(--border);border-radius:22px;padding:32px;box-shadow:0 25px 100px #0008}
+.login h1{font-size:25px;margin:0 0 8px}
+.login p{color:var(--muted);font-size:13px;line-height:1.7}
+.brand{font-size:11px;color:var(--accent);font-weight:900;letter-spacing:4px;margin-bottom:24px}
+input,select,textarea{width:100%;padding:12px;background:#0b0d14;color:white;border:1px solid var(--border);border-radius:9px;margin:6px 0}
+textarea{min-height:85px;resize:vertical}
+button{border:0;border-radius:9px;padding:11px 15px;font-weight:800}
+.primary{background:linear-gradient(100deg,#d3b4ff,#9b70ec);color:#130d1d}
+.secondary{background:#25283a;color:white;border:1px solid var(--border)}
+.danger{background:#54252d;color:#ffb3ba}
+.success{color:var(--green)}
+.error{color:var(--red)}
+#message{font-size:12px;margin-top:12px;min-height:18px}
+.layout{display:grid;grid-template-columns:235px 1fr;min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;background:#0d0f17;border-right:1px solid var(--border);padding:22px 14px;overflow:auto}
+.logo{font-size:15px;font-weight:900;letter-spacing:1px;padding:10px 12px 24px}
+.logo span{color:var(--accent)}
+.navlabel{font-size:9px;letter-spacing:2px;color:#666d81;padding:15px 12px 7px}
+.navbtn{width:100%;display:block;text-align:left;background:transparent;color:var(--muted);padding:11px 12px;margin:2px 0;font-size:12px}
+.navbtn:hover,.navbtn.active{background:#202033;color:white}
+.main{min-width:0;padding:30px;max-width:1600px;width:100%;margin:auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:28px}
+.top h1{font-size:26px;margin:0}
+.top p{font-size:12px;color:var(--muted);margin:7px 0 0}
+.panel{display:none}
+.panel.active{display:block}
+.heading{margin-bottom:22px}
+.heading h2{font-size:21px;margin:0 0 7px}
+.heading p{color:var(--muted);font-size:12px;margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:13px;margin-bottom:22px}
+.stat,.box{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px}
+.stat small{font-size:10px;color:var(--muted);letter-spacing:1px}
+.stat strong{display:block;font-size:27px;margin-top:12px}
+.box{margin-bottom:16px}
+.box h3{font-size:14px;margin:0 0 15px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--border);font-size:11px}
+th{font-size:9px;color:var(--muted);letter-spacing:1px}
+.tablewrap{overflow-x:auto}
+.muted{color:var(--muted);font-size:12px}
+.item{padding:13px;border:1px solid var(--border);border-radius:10px;margin:8px 0;background:#10121b}
+.item strong{font-size:13px}
+.item small{display:block;color:var(--muted);margin-top:5px}
+.tag{display:inline-block;border-radius:6px;background:#272337;color:#d7c0ff;padding:5px 8px;font-size:10px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.toolbar input{max-width:300px}
+.notice{padding:13px;background:#211e31;border:1px solid #51416c;border-radius:10px;color:#d6c3f2;font-size:12px;line-height:1.6;margin-bottom:15px}
+hr{border:0;border-top:1px solid var(--border);margin:18px 0}
+@media(max-width:850px){
+ .layout{grid-template-columns:1fr}
+ .sidebar{height:auto;position:relative;padding:12px}
+ .logo{padding:8px}
+ .navgroup{display:flex;flex-wrap:wrap;gap:3px}
+ .navlabel{width:100%}
+ .navbtn{width:auto;padding:9px;font-size:10px}
+ .main{padding:18px}
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login">
+    <div class="brand">NEROLYMPICS CONTROL</div>
+    <h1>Staff Sign In</h1>
+    <p>Authorized staff access only. Sign in to manage the competition.</p>
+    <form id="loginForm">
+      <input id="username" placeholder="Username" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+      <button class="primary" style="width:100%;margin-top:10px">SIGN IN</button>
+    </form>
+    <div id="message"></div>
+  </div>
+</div>
+
+<div id="dashboard" class="layout hidden">
+  <aside class="sidebar">
+    <div class="logo">NERO<span>LYMPICS</span></div>
+    <div class="navgroup">
+      <div class="navlabel">OVERVIEW</div>
+      <button class="navbtn active" data-panel="overview">Dashboard</button>
+      <button class="navbtn" data-panel="analytics">Analytics</button>
+
+      <div class="navlabel">PARTICIPANTS</div>
+      <button class="navbtn" data-panel="players">Player Database</button>
+      <button class="navbtn" data-panel="checkin">Player Check-in</button>
+      <button class="navbtn" data-panel="teams">Team Management</button>
+      <button class="navbtn" data-panel="comparison">Team Comparison</button>
+
+      <div class="navlabel">COMPETITION</div>
+      <button class="navbtn" data-panel="events">Event Schedule</button>
+      <button class="navbtn" data-panel="matches">Match Management</button>
+      <button class="navbtn" data-panel="scoring">Points & Achievements</button>
+      <button class="navbtn" data-panel="challenges">Bonus Challenges</button>
+      <button class="navbtn" data-panel="mvp">MVP Voting</button>
+
+      <div class="navlabel">PUBLIC WEBSITE</div>
+      <button class="navbtn" data-panel="announcements">Announcements</button>
+      <button class="navbtn" data-panel="winner">Winner Announcement</button>
+      <button class="navbtn" data-panel="prizes">Prize Distribution</button>
+
+      <div class="navlabel">SYSTEM</div>
+      <button class="navbtn" data-panel="backup">Backups & Export</button>
+    </div>
+    <hr>
+    <button class="navbtn" id="logoutButton">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <p>Nerolympics event management system</p>
+      </div>
+      <span class="tag" id="roleTag">STAFF</span>
+    </div>
+
+    <section class="panel active" id="overview">
+      <div class="heading"><h2>Competition Overview</h2><p>Your event at a glance.</p></div>
+      <div class="cards" id="overviewStats"></div>
+      <div class="box">
+        <h3>Quick Actions</h3>
+        <div class="actions">
+          <button class="primary" onclick="showPanel('players')">Add Participant</button>
+          <button class="secondary" onclick="showPanel('teams')">Generate Teams</button>
+          <button class="secondary" onclick="showPanel('matches')">Create Match</button>
+          <button class="secondary" onclick="showPanel('winner')">Announce Winner</button>
+        </div>
+      </div>
+      <div class="box">
+        <h3>Recent Announcements</h3>
+        <div id="recentAnnouncements"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="analytics">
+      <div class="heading"><h2>Event Analytics</h2><p>Statistics calculated from saved event records.</p></div>
+      <div class="cards" id="analyticsStats"></div>
+      <div class="box"><h3>Participation Overview</h3><div id="participationStats"></div></div>
+    </section>
+
+    <section class="panel" id="players">
+      <div class="heading"><h2>Player Database</h2><p>Register and manage participants.</p></div>
+      <div class="box">
+        <h3>Register Participant</h3>
+        <form id="addPlayerForm" class="formgrid">
+          <input id="newRoblox" placeholder="Roblox username" required>
+          <input id="newDiscord" placeholder="Discord username" required>
+          <button class="primary">ADD PARTICIPANT</button>
+        </form>
+      </div>
+      <div class="box">
+        <div class="toolbar">
+          <input id="playerSearch" placeholder="Search Roblox or Discord username">
+          <select id="playerFilter" style="max-width:180px">
+            <option value="">All statuses</option>
+            <option>Registered</option><option>Active</option>
+            <option>Absent</option><option>Disqualified</option>
+          </select>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Roblox</th><th>Discord</th><th>Status</th><th>Points</th><th>Team</th><th>Actions</th></tr></thead>
+          <tbody id="playersTable"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section class="panel" id="checkin">
+      <div class="heading"><h2>Player Check-in</h2><p>Record attendance for each event.</p></div>
+      <div class="box">
+        <h3>Record Attendance</h3>
+        <form id="checkinForm" class="formgrid">
+          <select id="checkPlayer" required></select>
+          <select id="checkEvent" required></select>
+          <select id="checkStatus"><option>Present</option><option>Absent</option><option>Late</option></select>
+          <button class="primary">SAVE CHECK-IN</button>
+        </form>
+      </div>
+      <div class="box"><h3>Attendance Records</h3><div id="checkinList"></div></div>
+    </section>
+
+    <section class="panel" id="teams">
+      <div class="heading"><h2>Team Management</h2><p>Generate random teams, assign captains, and publish them.</p></div>
+      <div class="notice">Team size is customizable. You can reroll before publishing. Once published, team assignments are locked.</div>
+      <div class="box">
+        <h3>Random Team Generator</h3>
+        <form id="teamForm" class="formgrid">
+          <input id="teamSize" type="number" min="2" max="50" value="4" required placeholder="Players per team">
+          <button class="primary">GENERATE TEAMS</button>
+        </form>
+        <div class="actions">
+          <button class="secondary" id="publishTeams">PUBLISH TEAMS</button>
+          <button class="danger" id="resetTeams">RESET UNPUBLISHED TEAMS</button>
+        </div>
+        <p id="teamLock" class="muted"></p>
+      </div>
+      <div class="box"><h3>Team Preview</h3><div id="teamList"></div></div>
+    </section>
+
+    <section class="panel" id="comparison">
+      <div class="heading"><h2>Team Comparison</h2><p>Compare team points, victories, attendance, and match history.</p></div>
+      <div class="box"><div class="tablewrap"><table>
+        <thead><tr><th>Team</th><th>Points</th><th>Wins</th><th>Participation</th><th>Completed Matches</th></tr></thead>
+        <tbody id="comparisonTable"></tbody>
+      </table></div></div>
+    </section>
+
+    <section class="panel" id="events">
+      <div class="heading"><h2>Event Schedule Manager</h2><p>Create and update the public event schedule.</p></div>
+      <div class="box">
+        <h3>Create Event</h3>
+        <form id="eventForm">
+          <input id="eventTitle" placeholder="Event name" required>
+          <textarea id="eventDescription" placeholder="Description"></textarea>
+          <label class="muted">Start date and time</label>
+          <input id="eventStart" type="datetime-local" required>
+          <button class="primary">CREATE EVENT</button>
+        </form>
+        <p class="muted">Enter the event time in the staff member's local timezone. It will be stored as an exact time and converted for visitors.</p>
+      </div>
+      <div class="box"><h3>Manage Events</h3><div id="eventList"></div></div>
+    </section>
+
+    <section class="panel" id="matches">
+      <div class="heading"><h2>Match Management</h2><p>Create matches and record official results.</p></div>
+      <div class="box">
+        <h3>Create Match</h3>
+        <form id="matchForm">
+          <input id="matchTitle" placeholder="Match name" required>
+          <select id="matchEvent"></select>
+          <div id="matchTeamChoices"></div>
+          <label class="muted">Scheduled time (optional)</label>
+          <input id="matchTime" type="datetime-local">
+          <button class="primary">CREATE MATCH</button>
+        </form>
+      </div>
+      <div class="box"><h3>Matches</h3><div id="matchList"></div></div>
+    </section>
+
+    <section class="panel" id="scoring">
+      <div class="heading"><h2>Points & Achievements</h2><p>Award points and recognize individual accomplishments.</p></div>
+      <div class="box">
+        <h3>Award Points</h3>
+        <form id="pointsForm" class="formgrid">
+          <select id="pointsPlayer" required></select>
+          <input id="pointsAmount" type="number" placeholder="Points (positive or negative)" required>
+          <button class="primary">AWARD POINTS</button>
+        </form>
+      </div>
+      <div class="box">
+        <h3>Give Achievement</h3>
+        <form id="achievementForm" class="formgrid">
+          <select id="achievementPlayer" required></select>
+          <input id="achievementName" placeholder="Achievement name" required>
+          <button class="primary">GIVE ACHIEVEMENT</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel" id="challenges">
+      <div class="heading"><h2>Bonus Challenges</h2><p>Create optional challenges with bonus points and achievements.</p></div>
+      <div class="box">
+        <h3>Create Challenge</h3>
+        <form id="challengeForm">
+          <input id="challengeTitle" placeholder="Challenge title" required>
+          <textarea id="challengeDescription" placeholder="Challenge description"></textarea>
+          <div class="formgrid">
+            <input id="challengePoints" type="number" value="5" placeholder="Point reward">
+            <input id="challengeAchievement" placeholder="Achievement reward (optional)">
+          </div>
+          <label><input id="challengePublish" type="checkbox" style="width:auto"> Publish challenge publicly</label>
+          <button class="primary">CREATE CHALLENGE</button>
+        </form>
+      </div>
+      <div class="box"><h3>Challenges</h3><div id="challengeList"></div></div>
+    </section>
+
+    <section class="panel" id="mvp">
+      <div class="heading"><h2>MVP Voting</h2><p>Manage participant voting and view results after closing.</p></div>
+      <div class="box">
+        <h3>Voting Controls</h3>
+        <p id="votingStatus" class="muted"></p>
+        <div class="actions">
+          <button class="primary" id="openVoting">OPEN VOTING</button>
+          <button class="secondary" id="closeVoting">CLOSE VOTING</button>
+          <button class="danger" id="resetVoting">RESET VOTES</button>
+        </div>
+      </div>
+      <div class="box"><h3>Voting Results</h3><div id="voteResults"></div></div>
+    </section>
+
+    <section class="panel" id="announcements">
+      <div class="heading"><h2>Announcement Manager</h2><p>Publish news and updates to the public website.</p></div>
+      <div class="box">
+        <h3>Create Announcement</h3>
+        <form id="announcementForm">
+          <input id="announcementTitle" placeholder="Announcement title" required>
+          <textarea id="announcementBody" placeholder="Announcement message" required></textarea>
+          <label><input id="announcementPublish" type="checkbox" style="width:auto"> Publish immediately</label>
+          <button class="primary">SAVE ANNOUNCEMENT</button>
+        </form>
+      </div>
+      <div class="box"><h3>Manage Announcements</h3><div id="announcementList"></div></div>
+    </section>
+
+    <section class="panel" id="winner">
+      <div class="heading"><h2>Championship Announcement</h2><p>Officially select and announce the winning team.</p></div>
+      <div class="notice">Publishing a champion triggers the animated winner reveal on the public website. Check the selected team carefully before publishing.</div>
+      <div class="box">
+        <h3>Select Champion</h3>
+        <form id="winnerForm">
+          <select id="winnerTeam" required></select>
+          <textarea id="winnerMessage" placeholder="Optional championship message"></textarea>
+          <button class="primary">PUBLISH CHAMPIONSHIP WINNER</button>
+        </form>
+        <div id="currentWinner" class="muted" style="margin-top:15px"></div>
+        <button id="clearWinner" class="danger" style="margin-top:10px">REMOVE PUBLIC WINNER ANNOUNCEMENT</button>
+      </div>
+    </section>
+
+    <section class="panel" id="prizes">
+      <div class="heading"><h2>Prize Distribution</h2><p>Track earned rewards and delivery.</p></div>
+      <div class="box">
+        <h3>Assign Prize</h3>
+        <form id="prizeForm" class="formgrid">
+          <select id="prizePlayer" required></select>
+          <input id="prizeReward" placeholder="Reward earned" required>
+          <label><input id="prizePublic" type="checkbox" style="width:auto"> Show publicly</label>
+          <button class="primary">ASSIGN PRIZE</button>
+        </form>
+      </div>
+      <div class="box"><h3>Prize Records</h3><div id="prizeList"></div></div>
+    </section>
+
+    <section class="panel" id="backup">
+      <div class="heading"><h2>Backups & Data Export</h2><p>Protect your event records and export data.</p></div>
+      <div class="box">
+        <h3>Backup and Restore</h3>
+        <p class="muted">Download a JSON backup or restore a previous backup. Restoring replaces current event data.</p>
+        <div class="actions">
+          <button class="primary" id="downloadBackup">EXPORT FULL BACKUP</button>
+          <button class="secondary" id="exportPlayers">EXPORT PLAYER CSV</button>
+          <button class="secondary" id="exportMatches">EXPORT MATCH CSV</button>
+        </div>
+        <hr>
+        <input type="file" id="restoreFile" accept=".json,application/json">
+        <button class="danger" id="restoreBackup">RESTORE BACKUP</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const API = "/api/staff";
+let state = null;
+let role = "staff";
+
+const $ = id => document.getElementById(id);
+
+async function request(url, options = {}) {
+  const response = await fetch(url, {
+    credentials:"same-origin",
+    ...options,
+    headers:{
+      ...(options.body ? {"Content-Type":"application/json"} : {}),
+      ...(options.headers || {})
+    }
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "Request failed.");
+  return result;
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#039;"
+  })[char]);
+}
+
+function message(text, isError = false) {
+  $("message").textContent = text;
+  $("message").className = isError ? "error" : "success";
+}
+
+async function action(type, payload = {}) {
+  try {
+    await request("/api/staff/action", {
+      method:"POST",
+      body:JSON.stringify({type,payload})
+    });
+    await loadState();
+    return true;
+  } catch (error) {
+    alert(error.message);
+    return false;
+  }
+}
+
+function showPanel(id) {
+  document.querySelectorAll(".panel").forEach(panel =>
+    panel.classList.toggle("active", panel.id === id)
+  );
+  document.querySelectorAll(".navbtn[data-panel]").forEach(button =>
+    button.classList.toggle("active", button.dataset.panel === id)
+  );
+
+  $("pageTitle").textContent =
+    document.querySelector(`[data-panel="${id}"]`)?.textContent || id;
+}
+
+document.querySelectorAll(".navbtn[data-panel]").forEach(button => {
+  button.addEventListener("click", () => showPanel(button.dataset.panel));
+});
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  message("Signing in...");
+
+  try {
+    const result = await request("/api/staff/login", {
+      method:"POST",
+      body:JSON.stringify({
+        username:$("username").value,
+        password:$("password").value
+      })
+    });
+
+    role = result.role;
+    $("roleTag").textContent = role.toUpperCase();
+    $("loginScreen").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    await loadState();
+  } catch (error) {
+    message(error.message, true);
+  }
+});
+
+$("logoutButton").addEventListener("click", async () => {
+  try {
+    await request("/api/staff/logout", {method:"POST"});
+  } finally {
+    location.reload();
+  }
+});
+
+async function checkSession() {
+  try {
+    const result = await request("/api/staff/me");
+    if (result.authenticated) {
+      role = result.role;
+      $("roleTag").textContent = role.toUpperCase();
+      $("loginScreen").classList.add("hidden");
+      $("dashboard").classList.remove("hidden");
+      await loadState();
+    }
+  } catch {}
+}
+
+async function loadState() {
+  const result = await request("/api/staff/state");
+  state = result;
+  renderAll();
+}
+
+function stat(label, value) {
+  return `<div class="stat"><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`;
+}
+
+function teamName(id) {
+  return state.teams.find(team => team.id === id)?.name || "Unassigned";
+}
+
+function renderAll() {
+  renderOverview();
+  renderPlayers();
+  renderCheckin();
+  renderTeams();
+  renderComparison();
+  renderEvents();
+  renderMatches();
+  renderChallenges();
+  renderMVP();
+  renderAnnouncements();
+  renderWinner();
+  renderPrizes();
+  renderAnalytics();
+  populateSelectors();
+}
+
+function renderOverview() {
+  const completed = state.matches.filter(m => m.status === "completed").length;
+  $("overviewStats").innerHTML = [
+    stat("PARTICIPANTS",state.players.length),
+    stat("TEAMS",state.teams.length),
+    stat("MATCHES COMPLETED",completed),
+    stat("TOTAL POINTS",state.players.reduce((s,p)=>s+(p.points||0),0))
+  ].join("");
+
+  $("recentAnnouncements").innerHTML = state.announcements.slice(0,4).map(a =>
+    `<div class="item"><strong>${esc(a.title)}</strong><small>${a.published?"Published":"Draft"}</small></div>`
+  ).join("") || '<p class="muted">No announcements yet.</p>';
+}
+
+function renderAnalytics() {
+  const completed = state.matches.filter(m=>m.status==="completed").length;
+  const wins = state.teams.reduce((s,t)=>s+(t.wins||0),0);
+  const points = state.players.reduce((s,p)=>s+(p.points||0),0);
+  const attendance = state.players.reduce((s,p)=>s+Object.values(p.checkIns||{}).filter(x=>x==="Present"||x==="Late").length,0);
+
+  $("analyticsStats").innerHTML = [
+    stat("TOTAL PARTICIPANTS",state.players.length),
+    stat("REGISTERED TEAMS",state.teams.length),
+    stat("COMPLETED MATCHES",completed),
+    stat("TEAM WINS",wins),
+    stat("TOTAL POINTS",points),
+    stat("ATTENDANCE RECORDS",attendance)
+  ].join("");
+
+  const statuses = ["Registered","Active","Absent","Disqualified"];
+  $("participationStats").innerHTML = statuses.map(status => {
+    const count = state.players.filter(p=>p.status===status).length;
+    return `<div class="item">${esc(status)} <strong style="float:right">${count}</strong></div>`;
+  }).join("");
+}
+
+function renderPlayers() {
+  const query = $("playerSearch").value.toLowerCase();
+  const filter = $("playerFilter").value;
+
+  const players = state.players.filter(player =>
+    (!filter || player.status===filter) &&
+    (player.roblox.toLowerCase().includes(query) ||
+     player.discord.toLowerCase().includes(query))
+  );
+
+  $("playersTable").innerHTML = players.map(player => `
+    <tr>
+      <td>${esc(player.roblox)}</td>
+      <td>${esc(player.discord)}</td>
+      <td>${esc(player.status)}</td>
+      <td>${player.points||0}</td>
+      <td>${esc(teamName(player.teamId))}</td>
+      <td>
+        <button class="secondary" onclick="editPlayer('${player.id}')">EDIT</button>
+        <button class="danger" onclick="deletePlayer('${player.id}')">DELETE</button>
+      </td>
+    </tr>
+  `).join("") || '<tr><td colspan="6">No participants found.</td></tr>';
+}
+
+$("playerSearch").addEventListener("input",renderPlayers);
+$("playerFilter").addEventListener("change",renderPlayers);
+
+window.editPlayer = async id => {
+  const player = state.players.find(p=>p.id===id);
+  if (!player) return;
+
+  const roblox = prompt("Roblox username:",player.roblox);
+  if (roblox === null) return;
+  const discord = prompt("Discord username:",player.discord);
+  if (discord === null) return;
+  const status = prompt("Status:",player.status);
+  if (status === null) return;
+
+  await action("updatePlayer",{id,roblox,discord,status});
+};
+
+window.deletePlayer = async id => {
+  if (confirm("Delete this participant?")) await action("deletePlayer",{id});
+};
+
+$("addPlayerForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(await action("addPlayer",{
+    roblox:$("newRoblox").value,
+    discord:$("newDiscord").value
+  })) e.target.reset();
+});
+
+function populateSelectors() {
+  const players = state.players.map(p =>
+    `<option value="${p.id}">${esc(p.roblox)}</option>`
+  ).join("");
+
+  const teams = state.teams.map(t =>
+    `<option value="${t.id}">${esc(t.name)}</option>`
+  ).join("");
+
+  const events = state.events.map(e =>
+    `<option value="${e.id}">${esc(e.title)}</option>`
+  ).join("");
+
+  ["checkPlayer","pointsPlayer","achievementPlayer","prizePlayer"].forEach(id=>{
+    const el=$(id), old=el.value;
+    el.innerHTML='<option value="">Select participant</option>'+players;
+    el.value=old;
+  });
+
+  ["checkEvent","matchEvent"].forEach(id=>{
+    const el=$(id), old=el.value;
+    el.innerHTML='<option value="">Select event</option>'+events;
+    el.value=old;
+  });
+
+  $("winnerTeam").innerHTML='<option value="">Select winning team</option>'+teams;
+
+  $("matchTeamChoices").innerHTML = state.teams.map(t=>`
+    <label class="item" style="display:block">
+      <input type="checkbox" class="matchTeam" value="${t.id}" style="width:auto">
+      ${esc(t.name)}
+    </label>
+  `).join("") || '<p class="muted">Generate teams first.</p>';
+}
+
+function renderTeams() {
+  const published = state.settings.teamsPublished;
+  $("teamLock").textContent = published
+    ? "Teams have been published. Rerolling and editing are locked."
+    : "Teams are currently unpublished and can be rerolled.";
+
+  $("teamList").innerHTML = state.teams.map(team=>`
+    <div class="item">
+      <strong>${esc(team.name)}</strong>
+      <small>Captain: ${esc(team.captain||"Not assigned")}</small>
+      <small>${team.memberIds.map(id=>state.players.find(p=>p.id===id)?.roblox||"Unknown").map(esc).join(", ")}</small>
+      ${!published?`<div class="actions">
+        <button class="secondary" onclick="renameTeam('${team.id}')">EDIT TEAM</button>
+      </div>`:""}
+    </div>
+  `).join("") || '<p class="muted">No teams generated yet.</p>';
+}
+
+window.renameTeam = async id => {
+  const team=state.teams.find(t=>t.id===id);
+  const name=prompt("Team name:",team.name);
+  if(name===null)return;
+  const captain=prompt("Captain Roblox username:",team.captain||"");
+  if(captain===null)return;
+  await action("updateTeam",{id,name,captain});
+};
+
+$("teamForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!confirm("Generate new randomized teams? This replaces the current unpublished team preview."))return;
+  await action("generateTeams",{size:Number($("teamSize").value)});
+});
+
+$("publishTeams").addEventListener("click",async()=>{
+  if(confirm("Publish these teams to the public website? This locks team rerolls.")){
+    await action("publishTeams");
+  }
+});
+
+$("resetTeams").addEventListener("click",async()=>{
+  if(confirm("Reset all unpublished teams?"))await action("resetTeams");
+});
+
+function renderComparison() {
+  $("comparisonTable").innerHTML=state.teams.map(team=>{
+    const members=state.players.filter(p=>p.teamId===team.id);
+    const points=members.reduce((s,p)=>s+(p.points||0),0);
+    const attendance=members.reduce((s,p)=>s+Object.values(p.checkIns||{}).filter(v=>v==="Present"||v==="Late").length,0);
+    const matches=state.matches.filter(m=>m.teamIds.includes(team.id)&&m.status==="completed").length;
+    return `<tr><td>${esc(team.name)}</td><td>${points}</td><td>${team.wins||0}</td><td>${attendance}</td><td>${matches}</td></tr>`;
+  }).join("")||'<tr><td colspan="5">No teams available.</td></tr>';
+}
+
+function renderCheckin() {
+  $("checkinList").innerHTML=state.players.map(player=>{
+    const entries=Object.entries(player.checkIns||{});
+    return `<div class="item"><strong>${esc(player.roblox)}</strong><small>${entries.map(([eventId,status])=>{
+      const event=state.events.find(e=>e.id===eventId);
+      return `${esc(event?.title||"Event")}: ${esc(status)}`;
+    }).join(" · ")||"No check-ins yet"}</small></div>`;
+  }).join("")||'<p class="muted">No participants.</p>';
+}
+
+$("checkinForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  await action("checkin",{
+    playerId:$("checkPlayer").value,
+    eventId:$("checkEvent").value,
+    status:$("checkStatus").value
+  });
+});
+
+$("eventForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const date=new Date($("eventStart").value);
+  if(Number.isNaN(date.getTime()))return alert("Enter a valid date and time.");
+
+  const ok=await action("addEvent",{
+    title:$("eventTitle").value,
+    description:$("eventDescription").value,
+    startAt:date.toISOString()
+  });
+  if(ok)e.target.reset();
+});
+
+function renderEvents() {
+  $("eventList").innerHTML=state.events.map(event=>`
+    <div class="item">
+      <strong>${esc(event.title)}</strong>
+      <small>${esc(event.status)} · ${new Date(event.startAt).toLocaleString()}</small>
+      <small>${esc(event.description)}</small>
+      <div class="actions">
+        <button class="secondary" onclick="editEvent('${event.id}')">EDIT</button>
+        <button class="danger" onclick="deleteEvent('${event.id}')">DELETE</button>
+      </div>
+    </div>
+  `).join("")||'<p class="muted">No events created.</p>';
+}
+
+window.editEvent=async id=>{
+  const event=state.events.find(e=>e.id===id);
+  const title=prompt("Event title:",event.title);
+  if(title===null)return;
+  const description=prompt("Description:",event.description);
+  if(description===null)return;
+  const status=prompt("Status: Upcoming, Currently happening, or Completed",event.status);
+  if(status===null)return;
+  await action("updateEvent",{id,title,description,status});
+};
+
+window.deleteEvent=async id=>{
+  if(confirm("Delete this event?"))await action("deleteEvent",{id});
+};
+
+$("matchForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const teamIds=[...document.querySelectorAll(".matchTeam:checked")].map(x=>x.value);
+  const time=$("matchTime").value;
+  const ok=await action("addMatch",{
+    title:$("matchTitle").value,
+    eventId:$("matchEvent").value,
+    teamIds,
+    scheduledAt:time?new Date(time).toISOString():""
+  });
+  if(ok)e.target.reset();
+});
+
+function renderMatches() {
+  $("matchList").innerHTML=state.matches.map(match=>`
+    <div class="item">
+      <strong>${esc(match.title)}</strong>
+      <small>${esc(match.status)} · ${match.teamIds.map(id=>esc(teamName(id))).join(" vs ")}</small>
+      ${match.status!=="completed"?`
+        <div class="actions">
+          <select id="winner-${match.id}">
+            ${match.teamIds.map(id=>`<option value="${id}">${esc(teamName(id))}</option>`).join("")}
+          </select>
+          <button class="primary" onclick="completeMatch('${match.id}')">RECORD WINNER</button>
+        </div>
+      `:`<small>Winner: ${esc(teamName(match.winnerTeamId))}</small>`}
+    </div>
+  `).join("")||'<p class="muted">No matches created.</p>';
+}
+
+window.completeMatch=async id=>{
+  const winnerTeamId=$(`winner-${id}`).value;
+  if(confirm("Record this match winner and award 10 points to their team members?")){
+    await action("completeMatch",{matchId:id,winnerTeamId,awardPoints:true});
+  }
+};
+
+$("pointsForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  await action("awardPoints",{
+    playerId:$("pointsPlayer").value,
+    amount:Number($("pointsAmount").value)
+  });
+  e.target.reset();
+});
+
+$("achievementForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  await action("addAchievement",{
+    playerId:$("achievementPlayer").value,
+    name:$("achievementName").value
+  });
+  e.target.reset();
+});
+
+function renderChallenges() {
+  $("challengeList").innerHTML=state.challenges.map(challenge=>`
+    <div class="item">
+      <strong>${esc(challenge.title)}</strong>
+      <small>${esc(challenge.description)}</small>
+      <small>Reward: ${challenge.points} points · ${esc(challenge.achievement||"No achievement")}</small>
+      <small>${challenge.completedBy.length} completions · ${challenge.published?"Published":"Unpublished"}</small>
+      <select id="challengePlayer-${challenge.id}">
+        ${state.players.map(p=>`<option value="${p.id}">${esc(p.roblox)}</option>`).join("")}
+      </select>
+      <div class="actions">
+        <button class="primary" onclick="completeChallenge('${challenge.id}')">MARK COMPLETED</button>
+        <button class="danger" onclick="deleteChallenge('${challenge.id}')">DELETE</button>
+      </div>
+    </div>
+  `).join("")||'<p class="muted">No challenges created.</p>';
+}
+
+$("challengeForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const ok=await action("addChallenge",{
+    title:$("challengeTitle").value,
+    description:$("challengeDescription").value,
+    points:Number($("challengePoints").value),
+    achievement:$("challengeAchievement").value,
+    published:$("challengePublish").checked
+  });
+  if(ok)e.target.reset();
+});
+
+window.completeChallenge=async id=>{
+  await action("completeChallenge",{
+    challengeId:id,
+    playerId:$(`challengePlayer-${id}`).value
+  });
+};
+
+window.deleteChallenge=async id=>{
+  if(confirm("Delete this challenge?"))await action("deleteChallenge",{id});
+};
+
+async function renderMVP() {
+  const result=await request("/api/mvp");
+  $("votingStatus").textContent=result.open?"Voting is currently OPEN.":"Voting is currently CLOSED.";
+
+  $("voteResults").innerHTML=result.results.map((r,index)=>
+    `<div class="item">#${index+1} ${esc(r.roblox)} <strong style="float:right">${r.votes} votes</strong></div>`
+  ).join("")||'<p class="muted">Results are shown after voting closes.</p>';
+}
+
+$("openVoting").addEventListener("click",()=>action("toggleMvp",{open:true}));
+$("closeVoting").addEventListener("click",()=>action("toggleMvp",{open:false}));
+$("resetVoting").addEventListener("click",()=>{
+  if(confirm("Permanently clear all MVP votes?"))action("resetVotes");
+});
+
+function renderAnnouncements() {
+  $("announcementList").innerHTML=state.announcements.map(item=>`
+    <div class="item">
+      <strong>${esc(item.title)}</strong>
+      <small>${item.published?"Published":"Draft"}</small>
+      <small>${esc(item.body)}</small>
+      <div class="actions">
+        <button class="secondary" onclick="toggleAnnouncement('${item.id}',${!item.published})">${item.published?"UNPUBLISH":"PUBLISH"}</button>
+        <button class="danger" onclick="deleteAnnouncement('${item.id}')">DELETE</button>
+      </div>
+    </div>
+  `).join("")||'<p class="muted">No announcements.</p>';
+}
+
+$("announcementForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const ok=await action("addAnnouncement",{
+    title:$("announcementTitle").value,
+    body:$("announcementBody").value,
+    published:$("announcementPublish").checked
+  });
+  if(ok)e.target.reset();
+});
+
+window.toggleAnnouncement=async(id,published)=>{
+  await action("updateAnnouncement",{id,published});
+};
+
+window.deleteAnnouncement=async id=>{
+  if(confirm("Delete this announcement?"))await action("deleteAnnouncement",{id});
+};
+
+function renderWinner() {
+  $("currentWinner").textContent=state.winner
+    ?"Current public champion: "+state.winner.teamName
+    :"No winning team has been announced yet.";
+}
+
+$("winnerForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!confirm("Publish this team as the official Nerolympics champion?"))return;
+  await action("publishWinner",{
+    teamId:$("winnerTeam").value,
+    message:$("winnerMessage").value
+  });
+});
+
+$("clearWinner").addEventListener("click",()=>{
+  if(confirm("Remove the public championship announcement?"))action("clearWinner");
+});
+
+function renderPrizes() {
+  $("prizeList").innerHTML=state.prizes.map(prize=>`
+    <div class="item">
+      <strong>${esc(prize.playerName)}</strong>
+      <small>${esc(prize.reward)}</small>
+      <small>${prize.delivered?"Delivered":"Awaiting delivery"}</small>
+      <button class="secondary" onclick="togglePrize('${prize.id}',${!prize.delivered})">
+        ${prize.delivered?"MARK UNDELIVERED":"MARK DELIVERED"}
+      </button>
+    </div>
+  `).join("")||'<p class="muted">No prizes recorded.</p>';
+}
+
+$("prizeForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const ok=await action("addPrize",{
+    playerId:$("prizePlayer").value,
+    reward:$("prizeReward").value,
+    public:$("prizePublic").checked
+  });
+  if(ok)e.target.reset();
+});
+
+window.togglePrize=async(id,delivered)=>{
+  await action("updatePrize",{id,delivered});
+};
+
+function downloadFile(name,content,type) {
+  const blob=new Blob([content],{type});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+$("downloadBackup").addEventListener("click",()=>{
+  location.href="/api/staff/backup";
+});
+
+function csv(rows) {
+  return rows.map(row=>row.map(value=>
+    '"'+String(value??"").replace(/"/g,'""')+'"'
+  ).join(",")).join("\n");
+}
+
+$("exportPlayers").addEventListener("click",()=>{
+  const rows=[["Roblox","Discord","Status","Points","Team","Registration date"]];
+  state.players.forEach(p=>rows.push([
+    p.roblox,p.discord,p.status,p.points||0,teamName(p.teamId),p.registeredAt
+  ]));
+  downloadFile("nerolympics-players.csv",csv(rows),"text/csv");
+});
+
+$("exportMatches").addEventListener("click",()=>{
+  const rows=[["Match","Status","Teams","Winner","Scheduled"]];
+  state.matches.forEach(m=>rows.push([
+    m.title,m.status,m.teamIds.map(teamName).join(" vs "),
+    teamName(m.winnerTeamId),m.scheduledAt
+  ]));
+  downloadFile("nerolympics-matches.csv",csv(rows),"text/csv");
+});
+
+$("restoreBackup").addEventListener("click",async()=>{
+  const file=$("restoreFile").files[0];
+  if(!file)return alert("Choose a backup file first.");
+  if(!confirm("Restoring replaces the current event database. Continue?"))return;
+
+  try {
+    const backup=JSON.parse(await file.text());
+    await request("/api/staff/restore",{
+      method:"POST",
+      body:JSON.stringify(backup)
+    });
+    alert("Backup restored.");
+    await loadState();
+  } catch(error) {
+    alert(error.message||"Could not restore backup.");
+  }
+});
+
+checkSession();
+</script>
+</body>
+</html>
