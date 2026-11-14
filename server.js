@@ -41,6 +41,7 @@ const DEFAULT_PERMISSIONS = {
   addChallenge: true, completeChallenge: true, deleteChallenge: false,
   addAnnouncement: true, updateAnnouncement: true, deleteAnnouncement: false,
   publishWinner: false, clearWinner: false,
+  addHallOfFame: false, updateHallOfFame: false, deleteHallOfFame: false,
   selectMvp: true, publishMvp: false,
   addPrize: true, updatePrize: true, deletePrize: false, bulkPrizeDelivered: true,
   bulkPlayerStatus: true, bulkAwardPoints: true, bulkDeletePlayers: false,
@@ -173,7 +174,8 @@ function summaryFor(type, p) {
     awardPoints: 'Awarded points', bulkAwardPoints: 'Awarded points to multiple participants',
     addAchievement: 'Added achievement', addChallenge: `Created challenge ${p.title || ''}`, completeChallenge: 'Completed challenge', deleteChallenge: 'Moved challenge to Recycle Bin',
     addAnnouncement: `Created announcement ${p.title || ''}`, updateAnnouncement: 'Updated announcement', deleteAnnouncement: 'Moved announcement to Recycle Bin',
-    publishWinner: 'Published event winner', clearWinner: 'Cleared event winner', selectMvp: 'Selected MVP', publishMvp: 'Published MVP',
+    publishWinner: 'Published event winner', clearWinner: 'Cleared event winner',
+    addHallOfFame: 'Added Hall of Fame entry', updateHallOfFame: 'Updated Hall of Fame entry', deleteHallOfFame: 'Moved Hall of Fame entry to Recycle Bin', selectMvp: 'Selected MVP', publishMvp: 'Published MVP',
     addPrize: 'Added prize record', updatePrize: 'Updated prize record', deletePrize: 'Moved prize to Recycle Bin',
     bulkPlayerStatus: 'Changed participant statuses', bulkDeletePlayers: 'Moved participants to Recycle Bin',
     bulkAssignTeam: 'Assigned participants to a team', bulkPrizeDelivered: 'Updated prize delivery statuses',
@@ -295,6 +297,25 @@ async function performAction(state, type, p) {
     case 'bulkDeleteAnnouncements': {const ids=new Set(p.ids||[]);state.announcements=state.announcements.filter(a=>{if(!ids.has(a.id))return true;pushRecycle(state,'announcement',a);return false;});break;}
     case 'publishWinner': {const team=findById(state.teams,p.teamId,'Winning team');state.winner={id:id(),teamId:team.id,teamName:team.name,message:text(p.message,1000),published:true,publishedAt:now};state.hallOfFame.unshift({id:id(),teamId:team.id,teamName:team.name,message:state.winner.message,publishedAt:now});break;}
     case 'clearWinner': state.winner=null;break;
+    case 'addHallOfFame': {
+      const teamName = text(p.teamName, 100);
+      if (!teamName) throw new Error('Enter a team or player name.');
+      state.hallOfFame.unshift({id:id(),teamName,message:text(p.message,1000),publishedAt:p.publishedAt ? new Date(p.publishedAt).toISOString() : now});
+      break;
+    }
+    case 'updateHallOfFame': {
+      const entry = findById(state.hallOfFame,p.id,'Hall of Fame entry');
+      if (p.teamName !== undefined) entry.teamName = text(p.teamName,100);
+      if (p.message !== undefined) entry.message = text(p.message,1000);
+      if (p.publishedAt !== undefined) entry.publishedAt = p.publishedAt ? new Date(p.publishedAt).toISOString() : null;
+      break;
+    }
+    case 'deleteHallOfFame': {
+      const i = state.hallOfFame.findIndex(x=>x.id===p.id);
+      if (i<0) throw new Error('Hall of Fame entry not found.');
+      pushRecycle(state,'hallOfFame',state.hallOfFame.splice(i,1)[0]);
+      break;
+    }
     case 'selectMvp': {const player=findById(state.players,p.playerId,'MVP participant');state.settings.mvp={playerId:player.id,message:text(p.message,1000),published:false,publishedAt:null};break;}
     case 'publishMvp': {if(!state.settings.mvp.playerId)throw new Error('Select an MVP first.');state.settings.mvp.published=true;state.settings.mvp.publishedAt=now;break;}
     case 'addPrize': {const player=findById(state.players,p.playerId,'Participant');state.prizes.push({id:id(),playerId:player.id,playerName:player.roblox,reward:text(p.reward,150),delivered:bool(p.delivered),public:bool(p.public),createdAt:now});break;}
@@ -302,7 +323,7 @@ async function performAction(state, type, p) {
     case 'deletePrize': {const i=state.prizes.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Prize not found.');pushRecycle(state,'prize',state.prizes.splice(i,1)[0]);break;}
     case 'bulkPrizeDelivered': {const ids=new Set(p.ids||[]);state.prizes.forEach(x=>{if(ids.has(x.id))x.delivered=bool(p.delivered);});break;}
     case 'bulkDeleteTeams': {const ids=new Set(p.ids||[]);state.teams=state.teams.filter(t=>{if(!ids.has(t.id))return true;pushRecycle(state,'team',t);state.players.forEach(p=>{if(p.teamId===t.id)p.teamId=null;});return false;});break;}
-    case 'restoreRecycleItem': {const i=state.recycleBin.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Recycle Bin item not found.');const item=state.recycleBin[i];const map={player:'players',team:'teams',event:'events',match:'matches',challenge:'challenges',announcement:'announcements',prize:'prizes'};const key=map[item.type];if(!key)throw new Error('Unsupported restore type.');if(state[key].some(x=>x.id===item.record.id))throw new Error('A record with that ID already exists.');state[key].push(item.record);state.recycleBin.splice(i,1);if(item.type==='team'){(item.record.memberIds||[]).forEach(pid=>{const player=state.players.find(x=>x.id===pid);if(player)player.teamId=item.record.id;});}if(item.type==='player'&&item.record.teamId){const team=state.teams.find(t=>t.id===item.record.teamId);if(team&&!team.memberIds.includes(item.record.id))team.memberIds.push(item.record.id);}break;}
+    case 'restoreRecycleItem': {const i=state.recycleBin.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Recycle Bin item not found.');const item=state.recycleBin[i];const map={player:'players',team:'teams',event:'events',match:'matches',challenge:'challenges',announcement:'announcements',prize:'prizes',hallOfFame:'hallOfFame'};const key=map[item.type];if(!key)throw new Error('Unsupported restore type.');if(state[key].some(x=>x.id===item.record.id))throw new Error('A record with that ID already exists.');state[key].push(item.record);state.recycleBin.splice(i,1);if(item.type==='team'){(item.record.memberIds||[]).forEach(pid=>{const player=state.players.find(x=>x.id===pid);if(player)player.teamId=item.record.id;});}if(item.type==='player'&&item.record.teamId){const team=state.teams.find(t=>t.id===item.record.teamId);if(team&&!team.memberIds.includes(item.record.id))team.memberIds.push(item.record.id);}break;}
     case 'permanentDeleteRecycleItem': {const i=state.recycleBin.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Recycle Bin item not found.');state.recycleBin.splice(i,1);break;}
     case 'emptyRecycleBin': state.recycleBin=[];break;
     case 'updatePermissions': {const next=p.permissions||{};Object.keys(DEFAULT_PERMISSIONS).forEach(k=>{if(typeof next[k]==='boolean')state.settings.staffPermissions[k]=next[k];});break;}
