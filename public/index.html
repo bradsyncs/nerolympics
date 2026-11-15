@@ -202,7 +202,11 @@ function renderEvents(events) {
     .join('');
 }
 
-function renderLeaderboard(players, teams) {
+function publicName(player, settings) {
+  return settings?.displayDiscordNames && player?.discord ? player.discord : (player?.roblox || 'Participant');
+}
+
+function renderLeaderboard(players, teams, settings) {
   const host = $('leaderboardRows');
 
   const rows = players
@@ -219,14 +223,14 @@ function renderLeaderboard(players, teams) {
   host.innerHTML = rows.map((player, index) => `
     <tr>
       <td class="rank">${index + 1}</td>
-      <td><b>${esc(player.roblox)}</b></td>
+      <td><b>${esc(publicName(player, settings))}</b></td>
       <td>${esc(teams.find(team => team.id === player.teamId)?.name || '—')}</td>
       <td>${Number(player.points || 0).toLocaleString()}</td>
     </tr>
   `).join('');
 }
 
-function renderTeams(teams, players) {
+function renderTeams(teams, players, settings) {
   const host = $('teamCards');
 
   if (!teams.length) {
@@ -239,7 +243,7 @@ function renderTeams(teams, players) {
       <h3>${esc(team.name)}</h3>
       <p>${(team.memberIds || [])
         .map(playerId =>
-          esc(players.find(player => player.id === playerId)?.roblox || 'Participant')
+          esc(publicName(players.find(player => player.id === playerId), settings))
         )
         .join(' · ')}</p>
       <div class="meta">${Number(team.points || 0)} points · ${Number(team.wins || 0)} wins</div>
@@ -323,7 +327,7 @@ function renderPrizes(items) {
 }
 
 function renderHistory(history, hall) {
-  const entries = hall?.length ? hall : history || [];
+  const entries = Array.isArray(hall) ? hall : [];
 
   if (!entries.length) {
     return empty(
@@ -364,8 +368,8 @@ async function loadSite() {
     $('status').textContent = 'Event information is up to date.';
 
     renderEvents(data.events || []);
-    renderLeaderboard(data.players || [], data.teams || []);
-    renderTeams(data.teams || [], data.players || []);
+    renderLeaderboard(data.players || [], data.teams || [], data.settings || {});
+    renderTeams(data.teams || [], data.players || [], data.settings || {});
     renderAnnouncements(data.announcements || []);
     renderWinner(data.winner);
     renderMvp(data.mvp);
