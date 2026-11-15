@@ -369,13 +369,14 @@ function maintenancePage(message) {
 
 app.get('/health', (req,res)=>res.json({ok:true,service:'nerolympics'}));
 app.get('/staff', (req,res)=>res.sendFile(path.join(publicDir,'staff.html')));
+app.get('/staff/preview', requireStaff, (req,res)=>res.sendFile(path.join(publicDir,'index.html')));
 app.get('/', async (req,res)=>{
   try { const state=await getState(); if(state.settings.maintenanceMode) return res.status(503).send(maintenancePage(state.settings.maintenanceMessage)); }
   catch(e){console.error('Maintenance check failed:',e.message);}
   res.sendFile(path.join(publicDir,'index.html'));
 });
 app.get('/api/public/state', async (req,res)=>{
-  try {const state=await getState();if(state.settings.maintenanceMode)return res.status(503).json({maintenance:true,message:state.settings.maintenanceMessage});res.json(publicState(state));}
+  try {const state=await getState();const staffPreview=!!req.session?.role;if(state.settings.maintenanceMode&&!staffPreview)return res.status(503).json({maintenance:true,message:state.settings.maintenanceMessage});res.json(publicState(state));}
   catch(e){res.status(500).json({error:'Could not load event data.'});}
 });
 app.post('/api/staff/login', async (req,res)=>{
