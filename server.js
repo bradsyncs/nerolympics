@@ -52,9 +52,9 @@ const DEFAULT_PERMISSIONS = {
   setMaintenance: true
 };
 const ADMIN_ONLY_ACTIONS = new Set([
-  'clearWinner', 'setDisplayNames',
+  'clearWinner',
   'permanentDeleteRecycleItem', 'emptyRecycleBin', 'restoreVersion', 'undo',
-  'importBackup', 'updatePermissions', 'createBackup'
+  'importBackup', 'updatePermissions', 'createBackup', 'setCountdown'
 ]);
 const DEFAULT_STATE = {
   schemaVersion: SCHEMA_VERSION,
@@ -62,8 +62,8 @@ const DEFAULT_STATE = {
   settings: {
     teamsPublished: false,
     maintenanceMode: false,
-    displayDiscordNames: false,
     maintenanceMessage: 'The Nerolympics website is temporarily under maintenance. Please check back soon.',
+    eventStartAt: '2026-11-14T23:00:00.000Z',
     staffPermissions: { ...DEFAULT_PERMISSIONS },
     mvp: { playerId: null, message: '', published: false, publishedAt: null }
   },
@@ -143,7 +143,7 @@ function checkPermission(state, role, action) {
 }
 function publicState(state) {
   const players = state.players.filter(p => p.status !== 'Disqualified').map(p => ({
-    id: p.id, roblox: p.roblox, discord: p.discord || '', status: p.status, points: num(p.points), teamId: p.teamId || null,
+    id: p.id, roblox: p.roblox, status: p.status, points: num(p.points), teamId: p.teamId || null,
     achievements: Array.isArray(p.achievements) ? p.achievements : []
   }));
   const teams = state.settings.teamsPublished ? state.teams.map(t => ({
@@ -157,7 +157,7 @@ function publicState(state) {
     challenges: state.challenges.filter(c => c.published),
     announcements: state.announcements.filter(a => a.published),
     prizes: state.prizes.filter(p => p.public && p.delivered),
-    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, displayDiscordNames: !!state.settings.displayDiscordNames },
+    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt },
     winner: state.winner?.published ? state.winner : null,
     history: state.history,
     hallOfFame: state.hallOfFame,
@@ -176,6 +176,7 @@ function summaryFor(type, p) {
     addAchievement: 'Added achievement', addChallenge: `Created challenge ${p.title || ''}`, completeChallenge: 'Completed challenge', deleteChallenge: 'Moved challenge to Recycle Bin',
     addAnnouncement: `Created announcement ${p.title || ''}`, updateAnnouncement: 'Updated announcement', deleteAnnouncement: 'Moved announcement to Recycle Bin',
     publishWinner: 'Published event winner', clearWinner: 'Cleared event winner',
+    setCountdown: 'Updated event countdown date and time',
     addHallOfFame: 'Added Hall of Fame entry', updateHallOfFame: 'Updated Hall of Fame entry', deleteHallOfFame: 'Moved Hall of Fame entry to Recycle Bin', selectMvp: 'Selected MVP', publishMvp: 'Published MVP',
     addPrize: 'Added prize record', updatePrize: 'Updated prize record', deletePrize: 'Moved prize to Recycle Bin',
     bulkPlayerStatus: 'Changed participant statuses', bulkDeletePlayers: 'Moved participants to Recycle Bin',
@@ -329,7 +330,7 @@ async function performAction(state, type, p) {
     case 'emptyRecycleBin': state.recycleBin=[];break;
     case 'updatePermissions': {const next=p.permissions||{};Object.keys(DEFAULT_PERMISSIONS).forEach(k=>{if(typeof next[k]==='boolean')state.settings.staffPermissions[k]=next[k];});break;}
     case 'setMaintenance': state.settings.maintenanceMode=bool(p.enabled);state.settings.maintenanceMessage=text(p.message||state.settings.maintenanceMessage,1000);break;
-    case 'setDisplayNames': state.settings.displayDiscordNames=bool(p.enabled);break;
+    case 'setCountdown': { if (!p.eventStartAt || Number.isNaN(new Date(p.eventStartAt).getTime())) throw new Error('Enter a valid event date and time.'); state.settings.eventStartAt = new Date(p.eventStartAt).toISOString(); break; }
     default: throw new Error(`Unknown action: ${type}`);
   }
 }
@@ -359,24 +360,18 @@ async function mutate(req, res, type, payload = {}) {
 
 function maintenancePage(message) {
   const safe = String(message || DEFAULT_STATE.settings.maintenanceMessage).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10091b"><title>Maintenance | The Nerolympics</title><style>
-  *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;overflow:hidden;padding:24px;color:#f8f4ff;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(ellipse at 50% -10%,#39205d 0%,#160d25 42%,#080711 78%)}
-  body:before,body:after{content:"";position:fixed;width:340px;height:340px;border:1px solid #b794ff30;border-radius:50%;pointer-events:none;animation:float 9s ease-in-out infinite}body:before{top:-190px;left:-120px;box-shadow:0 0 0 28px #a78bfa0b,0 0 0 58px #a78bfa08}body:after{right:-180px;bottom:-210px;animation-delay:-4s;box-shadow:0 0 0 28px #a78bfa0b,0 0 0 58px #a78bfa08}
-  .card{position:relative;width:min(100%,700px);padding:clamp(30px,7vw,64px) clamp(22px,6vw,54px);text-align:center;border:1px solid #8b65bd80;border-radius:28px;background:linear-gradient(145deg,#241634ed,#100b1bed 72%);box-shadow:0 30px 100px #0009,0 0 65px #7c3aed24;backdrop-filter:blur(14px);overflow:hidden}.card:before{content:"";position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,transparent,#c4b5fd,#8b5cf6,transparent)}
-  .eyebrow{font-size:11px;font-weight:850;letter-spacing:.28em;color:#cbb4ff}.symbol{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 22px;border-radius:21px;font-size:30px;color:#fff;background:linear-gradient(145deg,#b794ff,#6d35c4);box-shadow:0 10px 38px #8b5cf677, inset 0 1px #fff7;animation:pulse 3s ease-in-out infinite}h1{margin:15px 0 12px;font-size:clamp(29px,7vw,48px);line-height:1.08;letter-spacing:-.04em}p{max-width:530px;margin:0 auto;color:#d0c2e2;font-size:15px;line-height:1.8;white-space:pre-wrap}.status{display:inline-flex;align-items:center;gap:9px;margin-top:28px;padding:9px 14px;border:1px solid #9c78d966;border-radius:99px;background:#211532;color:#dfd0ff;font-size:10px;font-weight:850;letter-spacing:.14em}.dot{width:7px;height:7px;border-radius:50%;background:#b794ff;box-shadow:0 0 12px #b794ff;animation:blink 1.5s infinite}.footer{margin-top:32px;color:#89769f;font-size:10px;font-weight:800;letter-spacing:.2em}@keyframes pulse{50%{transform:translateY(-4px);box-shadow:0 15px 45px #8b5cf699}}@keyframes blink{50%{opacity:.35}}@keyframes float{50%{transform:translateY(20px) scale(1.04)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
-  </style></head><body><main class="card"><div class="symbol">✦</div><div class="eyebrow">NEROTOPIA PRESENTS</div><h1>THE NEROLYMPICS</h1><p>${safe}</p><div class="status"><span class="dot"></span> WEBSITE TEMPORARILY UNAVAILABLE</div><div class="footer">ONE COMMUNITY. MULTIPLE TEAMS. ONLY ONE CAN WIN.</div></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10091b"><title>Maintenance | The Nerolympics</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% -10%,#56317d 0,#1a1028 38%,#080711 78%);color:#f7f2ff;font-family:Inter,system-ui,Arial,sans-serif;padding:24px}.glow{position:fixed;width:420px;height:420px;border-radius:50%;filter:blur(95px);background:#8b5cf6;opacity:.19;animation:pulse 5s ease-in-out infinite alternate}.card{position:relative;width:min(680px,100%);text-align:center;padding:clamp(30px,7vw,58px) 28px;border:1px solid #9870ce88;border-radius:26px;background:linear-gradient(145deg,#281a3dcc,#120d1deF);box-shadow:0 30px 100px #0009,0 0 55px #8b5cf622;backdrop-filter:blur(12px)}small{color:#d2baff;letter-spacing:.28em;font-weight:800;font-size:11px}.spark{margin:0 auto 17px;width:58px;height:58px;display:grid;place-items:center;border-radius:19px;background:linear-gradient(145deg,#c4a5ff,#7540d5);font-size:27px;box-shadow:0 0 35px #9b6cff77}h1{font-size:clamp(2.2rem,8vw,4.2rem);line-height:1.02;letter-spacing:-.05em;margin:18px 0;color:#fff}p{color:#d3c5e6;line-height:1.8;font-size:15px;white-space:pre-wrap}.line{height:1px;width:75px;margin:22px auto;background:linear-gradient(90deg,transparent,#b99aff,transparent)}.foot{color:#9885b5;font-size:10px;letter-spacing:.2em}@keyframes pulse{to{transform:scale(1.2);opacity:.3}}@media(prefers-reduced-motion:reduce){.glow{animation:none}}</style></head><body><div class="glow"></div><main class="card"><div class="spark">✦</div><small>NEROTOPIA PRESENTS</small><h1>THE NEROLYMPICS</h1><div class="line"></div><p>${safe}</p><div class="foot">WE'LL BE BACK SOON · THANK YOU FOR YOUR PATIENCE</div></main></body></html>`;
 }
 
 app.get('/health', (req,res)=>res.json({ok:true,service:'nerolympics'}));
 app.get('/staff', (req,res)=>res.sendFile(path.join(publicDir,'staff.html')));
-app.get('/staff/preview', requireStaff, (req,res)=>res.sendFile(path.join(publicDir,'index.html')));
 app.get('/', async (req,res)=>{
   try { const state=await getState(); if(state.settings.maintenanceMode) return res.status(503).send(maintenancePage(state.settings.maintenanceMessage)); }
   catch(e){console.error('Maintenance check failed:',e.message);}
   res.sendFile(path.join(publicDir,'index.html'));
 });
 app.get('/api/public/state', async (req,res)=>{
-  try {const state=await getState();const staffPreview=!!req.session?.role;if(state.settings.maintenanceMode&&!staffPreview)return res.status(503).json({maintenance:true,message:state.settings.maintenanceMessage});res.json(publicState(state));}
+  try {const state=await getState();if(state.settings.maintenanceMode)return res.status(503).json({maintenance:true,message:state.settings.maintenanceMessage});res.json(publicState(state));}
   catch(e){res.status(500).json({error:'Could not load event data.'});}
 });
 app.post('/api/staff/login', async (req,res)=>{
