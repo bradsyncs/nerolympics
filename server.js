@@ -39,7 +39,7 @@ async function discordRequest(url, options = {}, step = 'Discord API request') {
   return data;
 }
 
-async function getDiscordStaffAccess(discordUserId) {
+async function getDiscordStaffAccess(discordUserId, discordDisplayName = 'Discord User') {
   const guildId = String(process.env.DISCORD_GUILD_ID || '').trim();
   const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim().replace(/^Bot\s+/i, '');
   const botHeaders = { Authorization: `Bot ${botToken}` };
@@ -65,7 +65,10 @@ async function getDiscordStaffAccess(discordUserId) {
 
   const assignedRoles = roles.filter(role => member.roles.includes(role.id));
   const chancellor = roles.find(role => role.id === DISCORD_ROLE_IDS.chancellor);
+  const leadGuardian = roles.find(role => role.id === DISCORD_ROLE_IDS.leadGuardian);
   if (!chancellor) throw new Error('The configured Chancellor role was not found.');
+  if (!leadGuardian) throw new Error('The configured Lead Guardian role was not found.');
+  const memberDisplayName = member.nick || discordDisplayName || 'Discord User';
 
   const highestPosition = assignedRoles.reduce(
     (highest, role) => Math.max(highest, Number(role.position || 0)), -1
@@ -76,7 +79,7 @@ async function getDiscordStaffAccess(discordUserId) {
     const highestRole = assignedRoles
       .slice()
       .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))[0];
-    return { role: 'admin', roleName: highestRole?.name || 'Chancellor' };
+    return { role: 'admin', roleName: highestRole?.name || 'Chancellor', displayName: memberDisplayName, trackSignIn: false };
   }
 
   // Staff role hierarchy: Lead Guardian, Senior Guardian, then Guardian.
@@ -88,7 +91,7 @@ async function getDiscordStaffAccess(discordUserId) {
   for (const configured of staffRoles) {
     if (member.roles.includes(configured.id)) {
       const discordRole = roles.find(role => role.id === configured.id);
-      return { role: 'staff', roleName: discordRole?.name || configured.fallback };
+      return { role: 'staff', roleName: discordRole?.name || configured.fallback, displayName: memberDisplayName, trackSignIn: highestPosition < Number(leadGuardian.position || 0) };
     }
   }
 
@@ -144,7 +147,7 @@ const DEFAULT_PERMISSIONS = {
 const ADMIN_ONLY_ACTIONS = new Set([
   'clearWinner',
   'permanentDeleteRecycleItem', 'emptyRecycleBin', 'restoreVersion', 'undo',
-  'importBackup', 'updatePermissions', 'createBackup', 'setCountdown', 'setPublicNameMode'
+  'importBackup', 'updatePermissions', 'createBackup', 'setCountdown', 'setPublicNameMode', 'clearActivityLog'
 ]);
 const DEFAULT_STATE = {
   schemaVersion: SCHEMA_VERSION,
@@ -273,7 +276,7 @@ function summaryFor(type, p) {
     bulkPlayerStatus: 'Changed participant statuses', bulkDeletePlayers: 'Moved participants to Recycle Bin',
     bulkAssignTeam: 'Assigned participants to a team', bulkPrizeDelivered: 'Updated prize delivery statuses',
     bulkPublishAnnouncements: 'Updated announcement publication', bulkDeleteAnnouncements: 'Moved announcements to Recycle Bin',
-    bulkDeleteTeams: 'Moved teams to Recycle Bin', restoreRecycleItem: 'Restored item from Recycle Bin', bulkRestoreRecycleItems: 'Restored multiple Recycle Bin items'
+    bulkDeleteTeams: 'Moved teams to Recycle Bin', restoreRecycleItem: 'Restored item from Recycle Bin', bulkRestoreRecycleItems: 'Restored multiple Recycle Bin items', clearActivityLog: 'Cleared activity log'
   };
   return names[type] || `Performed ${type}`;
 }
@@ -436,6 +439,7 @@ async function performAction(state, type, p) {
     case 'restoreRecycleItem': {const i=state.recycleBin.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Recycle Bin item not found.');const item=state.recycleBin[i];const map={player:'players',team:'teams',event:'events',match:'matches',challenge:'challenges',announcement:'announcements',prize:'prizes',hallOfFame:'hallOfFame'};const key=map[item.type];if(!key)throw new Error('Unsupported restore type.');if(state[key].some(x=>x.id===item.record.id))throw new Error('A record with that ID already exists.');state[key].push(item.record);state.recycleBin.splice(i,1);if(item.type==='team'){(item.record.memberIds||[]).forEach(pid=>{const player=state.players.find(x=>x.id===pid);if(player)player.teamId=item.record.id;});}if(item.type==='player'&&item.record.teamId){const team=state.teams.find(t=>t.id===item.record.teamId);if(team&&!team.memberIds.includes(item.record.id))team.memberIds.push(item.record.id);}break;}
     case 'permanentDeleteRecycleItem': {const i=state.recycleBin.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Recycle Bin item not found.');state.recycleBin.splice(i,1);break;}
     case 'emptyRecycleBin': state.recycleBin=[];break;
+    case 'clearActivityLog': { state.activityLog=[]; state.versions.forEach(v=>{ if(v.snapshot) v.snapshot.activityLog=[]; }); break; }
     case 'updatePermissions': {const next=p.permissions||{};Object.keys(DEFAULT_PERMISSIONS).forEach(k=>{if(typeof next[k]==='boolean')state.settings.staffPermissions[k]=next[k];});break;}
     case 'setMaintenance': state.settings.maintenanceMode=bool(p.enabled);state.settings.maintenanceMessage=text(p.message||state.settings.maintenanceMessage,1000);break;
     case 'setCountdown': { if (!p.eventStartAt || Number.isNaN(new Date(p.eventStartAt).getTime())) throw new Error('Enter a valid event date and time.'); state.settings.eventStartAt = new Date(p.eventStartAt).toISOString(); break; }
@@ -451,10 +455,10 @@ async function mutate(req, res, type, payload = {}) {
     const state = await getState(client);
     if (!checkPermission(state, req.session.role, type)) throw Object.assign(new Error('Your staff account does not have permission to perform this action.'), { status: 403 });
     const summary = summaryFor(type, payload);
-    if (type !== 'setMaintenance') takeSnapshot(state, summary);
+    if (type !== 'setMaintenance' && type !== 'clearActivityLog') takeSnapshot(state, summary);
     await performAction(state, type, payload);
-    logActivity(state, summary, type, activityActor(req));
-    if (type !== 'setMaintenance') {
+    if (type !== 'clearActivityLog') logActivity(state, summary, type, activityActor(req));
+    if (type !== 'setMaintenance' && type !== 'clearActivityLog') {
       await client.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)', [JSON.stringify({ app: 'nerolympics', schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), data: state })]);
       await client.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)', [BACKUP_LIMIT]);
     }
@@ -518,7 +522,7 @@ app.get('/auth/discord/callback', async (req, res) => {
     const discordUser = await discordRequest(`${DISCORD_API}/users/@me`, {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
-    const access = await getDiscordStaffAccess(discordUser.id);
+    const access = await getDiscordStaffAccess(discordUser.id, discordUser.global_name || discordUser.username);
 
     await new Promise((resolve, reject) => {
       req.session.regenerate(error => error ? reject(error) : resolve());
@@ -527,16 +531,20 @@ app.get('/auth/discord/callback', async (req, res) => {
     req.session.roleName = access.roleName;
     req.session.discordId = discordUser.id;
     req.session.discordUsername = discordUser.username;
+    req.session.discordDisplayName = access.displayName || discordUser.global_name || discordUser.username;
+    req.session.trackSignIn = access.trackSignIn === true;
     await new Promise((resolve, reject) => {
       req.session.save(error => error ? reject(error) : resolve());
     });
 
-    try {
-      const state = await getState();
-      logActivity(state, 'Signed in to the staff dashboard', 'staffLogin', activityActor(req));
-      await saveState(state);
-    } catch (activityError) {
-      console.error('Could not record staff sign-in activity:', activityError.message);
+    if (req.session.trackSignIn) {
+      try {
+        const state = await getState();
+        logActivity(state, 'Signed in to the staff dashboard', 'staffLogin', activityActor(req));
+        await saveState(state);
+      } catch (activityError) {
+        console.error('Could not record staff sign-in activity:', activityError.message);
+      }
     }
 
     res.redirect('/staff?discord=connected');
@@ -557,37 +565,30 @@ app.get('/api/public/state', async (req,res)=>{
   try {const state=await getState();if(state.settings.maintenanceMode)return res.status(503).json({maintenance:true,message:state.settings.maintenanceMessage});res.json(publicState(state));}
   catch(e){res.status(500).json({error:'Could not load event data.'});}
 });
-app.post('/api/staff/login', async (req,res)=>{
-  const username=text(req.body.username,100);const password=String(req.body.password||'');
-  const safeEqual=(a,b)=>{const aa=Buffer.from(String(a));const bb=Buffer.from(String(b));return aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);};
-  let role=null;
-  if(safeEqual(username,process.env.ADMIN_USERNAME)&&safeEqual(password,process.env.ADMIN_PASSWORD))role='admin';
-  else if(safeEqual(username,process.env.STAFF_USERNAME)&&safeEqual(password,process.env.STAFF_PASSWORD))role='staff';
-  if(!role)return res.status(401).json({error:'Incorrect username or password.'});
-  req.session.regenerate(err=>{if(err)return res.status(500).json({error:'Could not start session.'});req.session.role=role;req.session.roleName=role==='admin'?'Admin':'Staff';req.session.save(()=>res.json({success:true,role,roleName:req.session.roleName}));});
-});
 app.post('/api/staff/logout',requireStaff,async(req,res)=>{
-  try {
-    const state = await getState();
-    logActivity(state, 'Signed out of the staff dashboard', 'staffLogout', activityActor(req));
-    await saveState(state);
-  } catch (error) {
-    console.error('Could not record staff sign-out activity:', error.message);
+  if (req.session.trackSignIn === true) {
+    try {
+      const state = await getState();
+      logActivity(state, 'Signed out of the staff dashboard', 'staffLogout', activityActor(req));
+      await saveState(state);
+    } catch (error) {
+      console.error('Could not record staff sign-out activity:', error.message);
+    }
   }
   req.session.destroy(()=>res.json({success:true}));
 });
-app.get('/api/staff/me',(req,res)=>res.json({authenticated:!!req.session?.role,role:req.session?.role||null,roleName:req.session?.roleName||(req.session?.role==='admin'?'Admin':'Staff'),discordUsername:req.session?.discordUsername||null}));
+app.get('/api/staff/me',(req,res)=>res.json({authenticated:!!req.session?.role,role:req.session?.role||null,roleName:req.session?.roleName||(req.session?.role==='admin'?'Admin':'Staff'),discordUsername:req.session?.discordUsername||null,displayName:req.session?.discordDisplayName||req.session?.discordUsername||'Discord User'}));
 app.get('/api/staff/state',requireStaff,async(req,res)=>{try{const state=await getState();if(req.session.role==='staff'){state.versions=[];state.backups=[];}res.json(state);}catch(e){res.status(500).json({error:'Could not load staff data.'});}});
 app.post('/api/staff/action',requireStaff,async(req,res)=>{
   const {type,payload}=req.body||{};
   if(typeof type!=='string')return res.status(400).json({error:'Action type is required.'});
-  if(type==='restoreVersion'||type==='undo'||type==='importBackup'||type==='createBackup'||type==='updatePermissions'||type==='permanentDeleteRecycleItem'||type==='emptyRecycleBin'){
+  if(type==='restoreVersion'||type==='undo'||type==='importBackup'||type==='createBackup'||type==='updatePermissions'||type==='permanentDeleteRecycleItem'||type==='emptyRecycleBin'||type==='clearActivityLog'){
     if(req.session.role!=='admin')return res.status(403).json({error:'Admin access required.'});
     if(type==='restoreVersion'||type==='undo')return restoreVersion(req,res,type,payload||{});
     if(type==='importBackup')return importBackup(req,res,payload||{});
     if(type==='createBackup')return createBackup(req,res);
     if(type==='updatePermissions')return mutate(req,res,'updatePermissions',payload||{});
-    if(type==='permanentDeleteRecycleItem'||type==='emptyRecycleBin')return mutate(req,res,type,payload||{});
+    if(type==='permanentDeleteRecycleItem'||type==='emptyRecycleBin'||type==='clearActivityLog')return mutate(req,res,type,payload||{});
   }
   return mutate(req,res,type,payload||{});
 });
