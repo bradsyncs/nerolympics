@@ -54,7 +54,7 @@ const DEFAULT_PERMISSIONS = {
 const ADMIN_ONLY_ACTIONS = new Set([
   'clearWinner',
   'permanentDeleteRecycleItem', 'emptyRecycleBin', 'restoreVersion', 'undo',
-  'importBackup', 'updatePermissions', 'createBackup', 'setCountdown'
+  'importBackup', 'updatePermissions', 'createBackup', 'setCountdown', 'setPublicNameMode'
 ]);
 const DEFAULT_STATE = {
   schemaVersion: SCHEMA_VERSION,
@@ -64,6 +64,7 @@ const DEFAULT_STATE = {
     maintenanceMode: false,
     maintenanceMessage: 'The Nerolympics website is temporarily under maintenance. Please check back soon.',
     eventStartAt: '2026-11-14T23:00:00.000Z',
+    displayDiscordNames: false,
     staffPermissions: { ...DEFAULT_PERMISSIONS },
     mvp: { playerId: null, message: '', published: false, publishedAt: null }
   },
@@ -143,19 +144,12 @@ function checkPermission(state, role, action) {
 }
 function publicState(state) {
   const players = state.players.filter(p => p.status !== 'Disqualified').map(p => ({
-    id: p.id, roblox: p.roblox, status: p.status, points: num(p.points), teamId: p.teamId || null,
+    id: p.id, roblox: p.roblox, discord: state.settings.displayDiscordNames ? (p.discord || '') : '', status: p.status, points: num(p.points), teamId: p.teamId || null,
     achievements: Array.isArray(p.achievements) ? p.achievements : []
   }));
-  const teams = state.settings.teamsPublished ? state.teams.map(t => {
-    const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
-    const memberPoints = players
-      .filter(player => memberIds.includes(player.id))
-      .reduce((total, player) => total + num(player.points), 0);
-    return {
-      id: t.id, name: t.name, captain: t.captain || '',
-      memberIds, wins: num(t.wins), points: memberPoints
-    };
-  }) : [];
+  const teams = state.settings.teamsPublished ? state.teams.map(t => ({
+    id: t.id, name: t.name, captain: t.captain || '', memberIds: t.memberIds || [], wins: num(t.wins), points: num(t.points)
+  })) : [];
   const mvpPlayer = state.settings.mvp.published ? players.find(p => p.id === state.settings.mvp.playerId) : null;
   return {
     players, teams,
@@ -164,7 +158,7 @@ function publicState(state) {
     challenges: state.challenges.filter(c => c.published),
     announcements: state.announcements.filter(a => a.published),
     prizes: state.prizes.filter(p => p.public && p.delivered),
-    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt },
+    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt, displayDiscordNames: !!state.settings.displayDiscordNames },
     winner: state.winner?.published ? state.winner : null,
     history: state.history,
     hallOfFame: state.hallOfFame,
@@ -338,6 +332,7 @@ async function performAction(state, type, p) {
     case 'updatePermissions': {const next=p.permissions||{};Object.keys(DEFAULT_PERMISSIONS).forEach(k=>{if(typeof next[k]==='boolean')state.settings.staffPermissions[k]=next[k];});break;}
     case 'setMaintenance': state.settings.maintenanceMode=bool(p.enabled);state.settings.maintenanceMessage=text(p.message||state.settings.maintenanceMessage,1000);break;
     case 'setCountdown': { if (!p.eventStartAt || Number.isNaN(new Date(p.eventStartAt).getTime())) throw new Error('Enter a valid event date and time.'); state.settings.eventStartAt = new Date(p.eventStartAt).toISOString(); break; }
+    case 'setPublicNameMode': { state.settings.displayDiscordNames = bool(p.enabled); break; }
     default: throw new Error(`Unknown action: ${type}`);
   }
 }
