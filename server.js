@@ -23,27 +23,45 @@ function discordConfigReady() {
   );
 }
 
-async function discordRequest(url, options = {}) {
-  const response = await fetch(url, options);
+async function discordRequest(url, options = {}, step = 'Discord API request') {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    throw new Error(`${step}: network request failed (${error.message}).`);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || `Discord API request failed (${response.status}).`);
+    const code = data.code === undefined ? 'unknown' : data.code;
+    const message = data.message || 'No error message returned';
+    throw new Error(`${step}: HTTP ${response.status}, Discord code ${code}: ${message}`);
   }
   return data;
 }
 
 async function getDiscordStaffAccess(discordUserId) {
-  const guildId = process.env.DISCORD_GUILD_ID;
-  const botHeaders = { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` };
+  const guildId = String(process.env.DISCORD_GUILD_ID || '').trim();
+  const botToken = String(process.env.DISCORD_BOT_TOKEN || '').trim().replace(/^Bot\s+/i, '');
+  const botHeaders = { Authorization: `Bot ${botToken}` };
 
-  const [member, roles] = await Promise.all([
-    discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${discordUserId}`, {
-      headers: botHeaders
-    }),
-    discordRequest(`${DISCORD_API}/guilds/${guildId}/roles`, {
-      headers: botHeaders
-    })
-  ]);
+  // Verify which bot token Render is actually using, without logging the token.
+  const botUser = await discordRequest(`${DISCORD_API}/users/@me`, {
+    headers: botHeaders
+  }, 'Verify Render bot token');
+  console.log(`Discord bot token authenticated as ${botUser.username} (${botUser.id}).`);
+
+  // Check guild access separately so an Unknown Guild response is unambiguous.
+  const guild = await discordRequest(`${DISCORD_API}/guilds/${guildId}`, {
+    headers: botHeaders
+  }, `Check bot access to guild ${guildId}`);
+  console.log(`Discord bot can access guild ${guild.name} (${guild.id}).`);
+
+  const member = await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${discordUserId}`, {
+    headers: botHeaders
+  }, 'Check signing-in user membership');
+  const roles = await discordRequest(`${DISCORD_API}/guilds/${guildId}/roles`, {
+    headers: botHeaders
+  }, 'Read guild roles');
 
   const assignedRoles = roles.filter(role => member.roles.includes(role.id));
   const chancellor = roles.find(role => role.id === DISCORD_ROLE_IDS.chancellor);
@@ -498,7 +516,7 @@ app.get('/auth/discord/callback', async (req, res) => {
 
     res.redirect('/staff?discord=connected');
   } catch (error) {
-    console.error('Discord login failed:', error.message);
+    console.error('Discord login failed:', error.stack || error.message);
     res.status(403).send('Discord login failed. Make sure you are in the Nerolympics server and have an eligible staff role. Return to /staff to try again.');
   }
 });
