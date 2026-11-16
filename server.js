@@ -146,9 +146,16 @@ function publicState(state) {
     id: p.id, roblox: p.roblox, status: p.status, points: num(p.points), teamId: p.teamId || null,
     achievements: Array.isArray(p.achievements) ? p.achievements : []
   }));
-  const teams = state.settings.teamsPublished ? state.teams.map(t => ({
-    id: t.id, name: t.name, captain: t.captain || '', memberIds: t.memberIds || [], wins: num(t.wins), points: num(t.points)
-  })) : [];
+  const teams = state.settings.teamsPublished ? state.teams.map(t => {
+    const memberIds = Array.isArray(t.memberIds) ? t.memberIds : [];
+    const memberPoints = players
+      .filter(player => memberIds.includes(player.id))
+      .reduce((total, player) => total + num(player.points), 0);
+    return {
+      id: t.id, name: t.name, captain: t.captain || '',
+      memberIds, wins: num(t.wins), points: memberPoints
+    };
+  }) : [];
   const mvpPlayer = state.settings.mvp.published ? players.find(p => p.id === state.settings.mvp.playerId) : null;
   return {
     players, teams,
