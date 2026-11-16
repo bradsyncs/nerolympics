@@ -5,6 +5,78 @@ const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
 
+const DISCORD_API = 'https://discord.com/api/v10';
+const DISCORD_ROLE_IDS = {
+  guardian: '1528259761093611660',
+  seniorGuardian: '1528259692025876630',
+  leadGuardian: '1528259650619965440',
+  chancellor: '1528253939307253933'
+};
+
+function discordConfigReady() {
+  return Boolean(
+    process.env.DISCORD_CLIENT_ID &&
+    process.env.DISCORD_CLIENT_SECRET &&
+    process.env.DISCORD_BOT_TOKEN &&
+    process.env.DISCORD_GUILD_ID &&
+    process.env.DISCORD_REDIRECT_URI
+  );
+}
+
+async function discordRequest(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || `Discord API request failed (${response.status}).`);
+  }
+  return data;
+}
+
+async function getDiscordStaffAccess(discordUserId) {
+  const guildId = process.env.DISCORD_GUILD_ID;
+  const botHeaders = { Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}` };
+
+  const [member, roles] = await Promise.all([
+    discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${discordUserId}`, {
+      headers: botHeaders
+    }),
+    discordRequest(`${DISCORD_API}/guilds/${guildId}/roles`, {
+      headers: botHeaders
+    })
+  ]);
+
+  const assignedRoles = roles.filter(role => member.roles.includes(role.id));
+  const chancellor = roles.find(role => role.id === DISCORD_ROLE_IDS.chancellor);
+  if (!chancellor) throw new Error('The configured Chancellor role was not found.');
+
+  const highestPosition = assignedRoles.reduce(
+    (highest, role) => Math.max(highest, Number(role.position || 0)), -1
+  );
+
+  // Chancellor and every role above Chancellor receive full administrator access.
+  if (member.roles.includes(chancellor.id) || highestPosition >= Number(chancellor.position || 0)) {
+    const highestRole = assignedRoles
+      .slice()
+      .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))[0];
+    return { role: 'admin', roleName: highestRole?.name || 'Chancellor' };
+  }
+
+  // Staff role hierarchy: Lead Guardian, Senior Guardian, then Guardian.
+  const staffRoles = [
+    { id: DISCORD_ROLE_IDS.leadGuardian, fallback: 'Lead Guardian' },
+    { id: DISCORD_ROLE_IDS.seniorGuardian, fallback: 'Senior Guardian' },
+    { id: DISCORD_ROLE_IDS.guardian, fallback: 'Guardian' }
+  ];
+  for (const configured of staffRoles) {
+    if (member.roles.includes(configured.id)) {
+      const discordRole = roles.find(role => role.id === configured.id);
+      return { role: 'staff', roleName: discordRole?.name || configured.fallback };
+    }
+  }
+
+  throw new Error('You do not have an eligible Nerolympics staff role.');
+}
+
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
@@ -365,6 +437,72 @@ function maintenancePage(message) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10091b"><title>Maintenance | The Nerolympics</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% -10%,#56317d 0,#1a1028 38%,#080711 78%);color:#f7f2ff;font-family:Inter,system-ui,Arial,sans-serif;padding:24px}.glow{position:fixed;width:420px;height:420px;border-radius:50%;filter:blur(95px);background:#8b5cf6;opacity:.19;animation:pulse 5s ease-in-out infinite alternate}.card{position:relative;width:min(680px,100%);text-align:center;padding:clamp(30px,7vw,58px) 28px;border:1px solid #9870ce88;border-radius:26px;background:linear-gradient(145deg,#281a3dcc,#120d1deF);box-shadow:0 30px 100px #0009,0 0 55px #8b5cf622;backdrop-filter:blur(12px)}small{color:#d2baff;letter-spacing:.28em;font-weight:800;font-size:11px}.spark{margin:0 auto 17px;width:58px;height:58px;display:grid;place-items:center;border-radius:19px;background:linear-gradient(145deg,#c4a5ff,#7540d5);font-size:27px;box-shadow:0 0 35px #9b6cff77}h1{font-size:clamp(2.2rem,8vw,4.2rem);line-height:1.02;letter-spacing:-.05em;margin:18px 0;color:#fff}p{color:#d3c5e6;line-height:1.8;font-size:15px;white-space:pre-wrap}.line{height:1px;width:75px;margin:22px auto;background:linear-gradient(90deg,transparent,#b99aff,transparent)}.foot{color:#9885b5;font-size:10px;letter-spacing:.2em}@keyframes pulse{to{transform:scale(1.2);opacity:.3}}@media(prefers-reduced-motion:reduce){.glow{animation:none}}</style></head><body><div class="glow"></div><main class="card"><div class="spark">✦</div><small>NEROTOPIA PRESENTS</small><h1>THE NEROLYMPICS</h1><div class="line"></div><p>${safe}</p><div class="foot">WE'LL BE BACK SOON · THANK YOU FOR YOUR PATIENCE</div></main></body></html>`;
 }
 
+app.get('/auth/discord', (req, res) => {
+  if (!discordConfigReady()) return res.status(503).send('Discord login is not configured in Render.');
+
+  const oauthState = crypto.randomBytes(32).toString('hex');
+  req.session.discordOAuthState = oauthState;
+  req.session.save(error => {
+    if (error) return res.status(500).send('Could not start Discord login.');
+    const params = new URLSearchParams({
+      client_id: process.env.DISCORD_CLIENT_ID,
+      redirect_uri: process.env.DISCORD_REDIRECT_URI,
+      response_type: 'code',
+      scope: 'identify',
+      state: oauthState
+    });
+    res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
+  });
+});
+
+app.get('/auth/discord/callback', async (req, res) => {
+  try {
+    if (!discordConfigReady()) return res.status(503).send('Discord login is not configured in Render.');
+    if (req.query.error) return res.redirect('/staff?discord=cancelled');
+
+    const receivedState = String(req.query.state || '');
+    const savedState = String(req.session.discordOAuthState || '');
+    if (!receivedState || !savedState || receivedState.length !== savedState.length ||
+        !crypto.timingSafeEqual(Buffer.from(receivedState), Buffer.from(savedState))) {
+      return res.status(403).send('Discord login verification failed. Please return to the staff page and try again.');
+    }
+    delete req.session.discordOAuthState;
+
+    const tokenData = await discordRequest(`${DISCORD_API}/oauth2/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.DISCORD_CLIENT_ID,
+        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        grant_type: 'authorization_code',
+        code: String(req.query.code || ''),
+        redirect_uri: process.env.DISCORD_REDIRECT_URI
+      })
+    });
+
+    const discordUser = await discordRequest(`${DISCORD_API}/users/@me`, {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const access = await getDiscordStaffAccess(discordUser.id);
+
+    await new Promise((resolve, reject) => {
+      req.session.regenerate(error => error ? reject(error) : resolve());
+    });
+    req.session.role = access.role;
+    req.session.roleName = access.roleName;
+    req.session.discordId = discordUser.id;
+    req.session.discordUsername = discordUser.username;
+    await new Promise((resolve, reject) => {
+      req.session.save(error => error ? reject(error) : resolve());
+    });
+
+    res.redirect('/staff?discord=connected');
+  } catch (error) {
+    console.error('Discord login failed:', error.message);
+    res.status(403).send('Discord login failed. Make sure you are in the Nerolympics server and have an eligible staff role. Return to /staff to try again.');
+  }
+});
+
 app.get('/health', (req,res)=>res.json({ok:true,service:'nerolympics'}));
 app.get('/staff', (req,res)=>res.sendFile(path.join(publicDir,'staff.html')));
 app.get('/', async (req,res)=>{
@@ -383,10 +521,10 @@ app.post('/api/staff/login', async (req,res)=>{
   if(safeEqual(username,process.env.ADMIN_USERNAME)&&safeEqual(password,process.env.ADMIN_PASSWORD))role='admin';
   else if(safeEqual(username,process.env.STAFF_USERNAME)&&safeEqual(password,process.env.STAFF_PASSWORD))role='staff';
   if(!role)return res.status(401).json({error:'Incorrect username or password.'});
-  req.session.regenerate(err=>{if(err)return res.status(500).json({error:'Could not start session.'});req.session.role=role;req.session.save(()=>res.json({success:true,role}));});
+  req.session.regenerate(err=>{if(err)return res.status(500).json({error:'Could not start session.'});req.session.role=role;req.session.roleName=role==='admin'?'Admin':'Staff';req.session.save(()=>res.json({success:true,role,roleName:req.session.roleName}));});
 });
 app.post('/api/staff/logout',requireStaff,(req,res)=>req.session.destroy(()=>res.json({success:true})));
-app.get('/api/staff/me',(req,res)=>res.json({authenticated:!!req.session?.role,role:req.session?.role||null}));
+app.get('/api/staff/me',(req,res)=>res.json({authenticated:!!req.session?.role,role:req.session?.role||null,roleName:req.session?.roleName||(req.session?.role==='admin'?'Admin':'Staff'),discordUsername:req.session?.discordUsername||null}));
 app.get('/api/staff/state',requireStaff,async(req,res)=>{try{const state=await getState();if(req.session.role==='staff'){state.versions=[];state.backups=[];}res.json(state);}catch(e){res.status(500).json({error:'Could not load staff data.'});}});
 app.post('/api/staff/action',requireStaff,async(req,res)=>{
   const {type,payload}=req.body||{};
