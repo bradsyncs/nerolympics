@@ -293,9 +293,26 @@ function takeSnapshot(state, summary) {
   state.versions.unshift({ id: id(), createdAt: new Date().toISOString(), summary, snapshot: snap });
   state.versions = state.versions.slice(0, HISTORY_LIMIT);
 }
-function logActivity(state, summary, type) {
-  state.activityLog.unshift({ id: id(), timestamp: new Date().toISOString(), summary, type });
+function logActivity(state, summary, type, actor = {}) {
+  const actorName = text(actor.displayName || actor.discordUsername || 'Unknown staff member', 80);
+  const actorRole = text(actor.roleName || (actor.role === 'admin' ? 'Admin' : 'Staff'), 80);
+  state.activityLog.unshift({
+    id: id(),
+    timestamp: new Date().toISOString(),
+    summary,
+    type,
+    actor: { name: actorName, role: actorRole }
+  });
   state.activityLog = state.activityLog.slice(0, 250);
+}
+
+function activityActor(req) {
+  return {
+    displayName: req.session?.discordDisplayName,
+    discordUsername: req.session?.discordUsername,
+    roleName: req.session?.roleName,
+    role: req.session?.role
+  };
 }
 
 async function performAction(state, type, p) {
@@ -436,7 +453,7 @@ async function mutate(req, res, type, payload = {}) {
     const summary = summaryFor(type, payload);
     if (type !== 'setMaintenance') takeSnapshot(state, summary);
     await performAction(state, type, payload);
-    logActivity(state, summary, type);
+    logActivity(state, summary, type, activityActor(req));
     if (type !== 'setMaintenance') {
       await client.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)', [JSON.stringify({ app: 'nerolympics', schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), data: state })]);
       await client.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)', [BACKUP_LIMIT]);
@@ -514,6 +531,14 @@ app.get('/auth/discord/callback', async (req, res) => {
       req.session.save(error => error ? reject(error) : resolve());
     });
 
+    try {
+      const state = await getState();
+      logActivity(state, 'Signed in to the staff dashboard', 'staffLogin', activityActor(req));
+      await saveState(state);
+    } catch (activityError) {
+      console.error('Could not record staff sign-in activity:', activityError.message);
+    }
+
     res.redirect('/staff?discord=connected');
   } catch (error) {
     console.error('Discord login failed:', error.stack || error.message);
@@ -541,7 +566,16 @@ app.post('/api/staff/login', async (req,res)=>{
   if(!role)return res.status(401).json({error:'Incorrect username or password.'});
   req.session.regenerate(err=>{if(err)return res.status(500).json({error:'Could not start session.'});req.session.role=role;req.session.roleName=role==='admin'?'Admin':'Staff';req.session.save(()=>res.json({success:true,role,roleName:req.session.roleName}));});
 });
-app.post('/api/staff/logout',requireStaff,(req,res)=>req.session.destroy(()=>res.json({success:true})));
+app.post('/api/staff/logout',requireStaff,async(req,res)=>{
+  try {
+    const state = await getState();
+    logActivity(state, 'Signed out of the staff dashboard', 'staffLogout', activityActor(req));
+    await saveState(state);
+  } catch (error) {
+    console.error('Could not record staff sign-out activity:', error.message);
+  }
+  req.session.destroy(()=>res.json({success:true}));
+});
 app.get('/api/staff/me',(req,res)=>res.json({authenticated:!!req.session?.role,role:req.session?.role||null,roleName:req.session?.roleName||(req.session?.role==='admin'?'Admin':'Staff'),discordUsername:req.session?.discordUsername||null}));
 app.get('/api/staff/state',requireStaff,async(req,res)=>{try{const state=await getState();if(req.session.role==='staff'){state.versions=[];state.backups=[];}res.json(state);}catch(e){res.status(500).json({error:'Could not load staff data.'});}});
 app.post('/api/staff/action',requireStaff,async(req,res)=>{
@@ -560,9 +594,9 @@ app.post('/api/staff/action',requireStaff,async(req,res)=>{
 async function restoreVersion(req,res,type,payload){
   const client=await pool.connect();try{await client.query('BEGIN');const state=await getState(client);let version;
     if(type==='undo')version=state.versions[0];else version=state.versions.find(v=>v.id===payload.versionId);
-    if(!version)throw new Error('Version not found.');takeSnapshot(state,type==='undo'?'Before undo':'Before version restore');const restored=normalizeState(version.snapshot);restored.versions=state.versions;restored.activityLog=state.activityLog;restored.recycleBin=state.recycleBin;restored.backups=state.backups;logActivity(restored,type==='undo'?'Undid the latest change':'Restored a previous version',type);await saveState(restored,client);await client.query('COMMIT');res.json({success:true});
+    if(!version)throw new Error('Version not found.');takeSnapshot(state,type==='undo'?'Before undo':'Before version restore');const restored=normalizeState(version.snapshot);restored.versions=state.versions;restored.activityLog=state.activityLog;restored.recycleBin=state.recycleBin;restored.backups=state.backups;logActivity(restored,type==='undo'?'Undid the latest change':'Restored a previous version',type,activityActor(req));await saveState(restored,client);await client.query('COMMIT');res.json({success:true});
   }catch(e){await client.query('ROLLBACK').catch(()=>{});res.status(400).json({error:e.message});}finally{client.release();}}
-async function createBackup(req,res){try{const state=await getState();const data={app:'nerolympics',schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:state};await pool.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)',[JSON.stringify(data)]);await pool.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)',[BACKUP_LIMIT]);res.json({success:true,backup:data});}catch(e){res.status(500).json({error:'Backup failed.'});}}
+async function createBackup(req,res){try{const state=await getState();logActivity(state,'Created a manual backup','createBackup',activityActor(req));const data={app:'nerolympics',schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:state};await pool.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)',[JSON.stringify(data)]);await pool.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)',[BACKUP_LIMIT]);await saveState(state);res.json({success:true,backup:data});}catch(e){res.status(500).json({error:'Backup failed.'});}}
 async function importBackup(req, res, payload) {
   const body = payload.backup;
   if (!body || typeof body !== 'object' || Number(body.schemaVersion || 1) > SCHEMA_VERSION) {
@@ -588,7 +622,7 @@ async function importBackup(req, res, payload) {
     restored.activityLog = current.activityLog;
     restored.recycleBin = current.recycleBin;
     restored.backups = current.backups;
-    logActivity(restored, 'Imported a validated backup', 'importBackup');
+    logActivity(restored, 'Imported a validated backup', 'importBackup', activityActor(req));
     await saveState(restored, client);
     await client.query('COMMIT');
     res.json({ success: true });
