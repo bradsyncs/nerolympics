@@ -202,7 +202,9 @@ function renderEvents(events) {
     .join('');
 }
 
-function renderLeaderboard(players, teams) {
+function publicPlayerName(player, settings) { return settings?.displayDiscordNames && player?.discord ? player.discord : (player?.roblox || 'Participant'); }
+
+function renderLeaderboard(players, teams, settings) {
   const host = $('leaderboardRows');
 
   const rows = players
@@ -219,14 +221,14 @@ function renderLeaderboard(players, teams) {
   host.innerHTML = rows.map((player, index) => `
     <tr>
       <td class="rank">${index + 1}</td>
-      <td><b>${esc(player.roblox)}</b></td>
+      <td><b>${esc(publicPlayerName(player, settings))}</b></td>
       <td>${esc(teams.find(team => team.id === player.teamId)?.name || '—')}</td>
       <td>${Number(player.points || 0).toLocaleString()}</td>
     </tr>
   `).join('');
 }
 
-function renderTeams(teams, players) {
+function renderTeams(teams, players, settings) {
   const host = $('teamCards');
 
   if (!teams.length) {
@@ -239,7 +241,7 @@ function renderTeams(teams, players) {
       <h3>${esc(team.name)}</h3>
       <p>${(team.memberIds || [])
         .map(playerId =>
-          esc(players.find(player => player.id === playerId)?.roblox || 'Participant')
+          esc(publicPlayerName(players.find(player => player.id === playerId), settings))
         )
         .join(' · ')}</p>
       <div class="meta">${Number(team.points || 0)} points · ${Number(team.wins || 0)} wins</div>
@@ -306,7 +308,7 @@ function renderMvp(mvp) {
   $('mvp').hidden = false;
 
   $('mvpCard').innerHTML = `
-    <h3>${esc(mvp.player.roblox)}</h3>
+    <h3>${esc(publicPlayerName(mvp.player, window.publicDisplaySettings || {}))}</h3>
     <p>${esc(mvp.message || 'Recognized for an outstanding performance.')}</p>
   `;
 }
@@ -364,8 +366,9 @@ async function loadSite() {
     $('status').textContent = 'Event information is up to date.';
 
     renderEvents(data.events || []);
-    renderLeaderboard(data.players || [], data.teams || []);
-    renderTeams(data.teams || [], data.players || []);
+    window.publicDisplaySettings = data.settings || {};
+    renderLeaderboard(data.players || [], data.teams || [], data.settings || {});
+    renderTeams(data.teams || [], data.players || [], data.settings || {});
     renderAnnouncements(data.announcements || []);
     renderWinner(data.winner);
     renderMvp(data.mvp);
