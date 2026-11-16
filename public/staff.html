@@ -8,7 +8,17 @@
 </style>
 </head>
 <body>
-<section class="login" id="loginScreen"><form class="loginbox" id="loginForm"><h1>NEROLYMPICS</h1><p class="muted">Staff Control Center</p><label>Username</label><input id="loginUsername" autocomplete="username" required><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required><div class="toolbar"><button class="primary" type="submit">Sign In</button></div><p class="muted" id="loginError"></p></form></section>
+<section class="login" id="loginScreen">
+  <div class="loginbox">
+    <h1>NEROLYMPICS</h1>
+    <p class="muted">Staff Control Center</p>
+    <p class="muted">Sign in using your authorized Discord account.</p>
+    <div class="toolbar">
+      <button class="primary" type="button" id="discordLoginButton">Continue with Discord</button>
+    </div>
+    <p class="muted" id="loginError"></p>
+  </div>
+</section>
 <div class="layout hidden" id="dashboard"><div class="nav-scrim" id="navScrim"></div><aside class="sidebar"><div class="brand">NERO<span>OLYMPICS CONTROL CENTER</span></div><nav class="nav" id="nav"></nav><div class="sidebarfoot"><div class="muted" id="roleLabel"></div><button class="secondary small" id="logoutButton">Sign Out</button></div></aside><main class="main"><header class="top"><div class="top-start"><button class="menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false">☰</button><div><h1 id="pageTitle">Overview</h1><small id="lastUpdated">Event management system</small></div></div><div class="top-actions"><span class="role" id="rolePill">STAFF</span><button class="secondary" id="refreshButton">Refresh</button></div></header><div id="pages"></div></main></div>
 <div class="toast" id="toast"></div><div class="modal hidden" id="modal"><div class="modalbox"><div class="itemhead"><h2 id="modalTitle">Confirm</h2><button class="secondary small" id="modalClose">Close</button></div><div id="modalBody"></div><div class="toolbar" id="modalActions"></div></div></div>
 <script>
@@ -110,6 +120,6 @@ if(t.dataset.restoreVersion){if(role!=='admin')return toast('Admin access requir
 }catch(err){toast(err.message);}});
 $('modalClose').onclick=()=>$('modal').classList.add('hidden');$('refreshButton').onclick=loadState;$('logoutButton').onclick=async()=>{await api('/api/staff/logout',{method:'POST',body:'{}'});location.reload();};
 document.addEventListener('pointerdown',e=>{const b=e.target instanceof Element?e.target.closest('button'):null;if(b&&document.activeElement!==b){try{b.focus({preventScroll:true})}catch{}}},{passive:true});
-$('menuToggle').onclick=()=>{const open=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(open));$('menuToggle').setAttribute('aria-label',open?'Close navigation':'Open navigation');};$('navScrim').onclick=closeNav;document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNav()});$('loginForm').onsubmit=async e=>{e.preventDefault();$('loginError').textContent='';try{const r=await api('/api/staff/login',{method:'POST',body:JSON.stringify({username:$('loginUsername').value,password:$('loginPassword').value})});role=r.role;$('loginScreen').classList.add('hidden');$('dashboard').classList.remove('hidden');await loadState();bindEvents();}catch(err){$('loginError').textContent=err.message;}};
+$('menuToggle').onclick=()=>{const open=document.body.classList.toggle('menu-open');$('menuToggle').setAttribute('aria-expanded',String(open));$('menuToggle').setAttribute('aria-label',open?'Close navigation':'Open navigation');};$('navScrim').onclick=closeNav;document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNav()});$('discordLoginButton').onclick=()=>{location.href='/auth/discord';};
 (async()=>{try{const s=await api('/api/staff/me');if(s.authenticated){role=s.role;$('loginScreen').classList.add('hidden');$('dashboard').classList.remove('hidden');await loadState();bindEvents();}}catch{}})();
 </script></body></html>
