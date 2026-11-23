@@ -8,6 +8,26 @@
 
 /* Revamp: richer, editorial control center styling */
 :root{--accent:#c5a5ff;--panel:#191222;--line:#3b2a50}body{background:radial-gradient(ellipse at 20% -10%,#3b2455 0,transparent 34%),radial-gradient(ellipse at 100% 25%,#21142f 0,transparent 36%),#100c19;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Arial,sans-serif}.sidebar{background:linear-gradient(180deg,#1b1327,#100c19);border-right:1px solid #3a2a4e}.brand{font-size:19px;letter-spacing:.12em}.brand span{color:#b9a5d5}.nav-label{color:#b59ad8}.nav button.active{background:linear-gradient(100deg,#493065,#291d3a);border-color:#7654b8;box-shadow:inset 3px 0 #c5a5ff,0 8px 22px #0004}.nav button:hover{background:#291d3a}.main{padding:clamp(16px,3vw,32px)}.top{padding:14px 17px;border:1px solid #38274b;background:#191222;border-radius:18px;box-shadow:0 10px 35px #0003}.top h1{letter-spacing:-.04em}.card,.panel{background:linear-gradient(150deg,#241934,#171120);border:1px solid #3b2a50;border-radius:18px;box-shadow:0 12px 32px #0002}.stat strong{font-size:32px;letter-spacing:-.04em}.tablewrap{border-color:#3b2a50;border-radius:14px}th{background:#241934;color:#c0a9dc}td{border-color:#322440}button{border-radius:12px;transition:transform .15s,filter .15s}button:hover:not(:disabled){transform:translateY(-1px)}.primary{background:linear-gradient(135deg,#9569d2,#7144b0);border-color:#b59ad8}.loginbox{background:linear-gradient(150deg,#241934,#171120);border-color:#49336d;border-radius:24px}.role{background:#211832;border-color:#65498a}.toast{background:#7144b0}.modalbox{background:#1a1425;border-color:#65498a;border-radius:20px}@media(max-width:850px){.top{padding:12px;border-radius:15px}.main{padding:13px}.sidebar{background:#171120}}
+
+/* Galaxy motion pass: staff control center */
+:root{--accent:#c4a1ff;--panel:#131020;--panel2:#1b1530;--line:#3a2a55}
+body{background-color:#080610;background-image:radial-gradient(ellipse at 15% 5%,rgba(103,54,168,.22),transparent 42%),radial-gradient(ellipse at 90% 30%,rgba(63,44,131,.18),transparent 38%),linear-gradient(180deg,#080610,#0a0814 60%,#070610);background-size:150% 150%;animation:staffNebulaDrift 26s ease-in-out infinite alternate}
+@keyframes staffNebulaDrift{from{background-position:0% 0%,100% 20%,0 0}to{background-position:45% 25%,55% 75%,0 0}}
+#dashboard{animation:staffFade .45s ease both}
+@keyframes staffFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.panel,.card,.stat,.section,.box,.login-card,[class*=card],[class*=panel]{transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.panel:hover,.card:hover,.stat:hover,[class*=card]:hover{border-color:rgba(196,161,255,.38);box-shadow:0 8px 28px rgba(91,48,150,.12)}
+button{transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(145,91,221,.18)}button:active:not(:disabled){transform:translateY(0) scale(.98)}
+input,select,textarea{transition:border-color .2s ease,box-shadow .2s ease}input:focus,select:focus,textarea:focus{border-color:#b18bff;box-shadow:0 0 0 3px rgba(177,139,255,.12);outline:none}
+nav a,nav button,[role=tab]{transition:background .2s ease,color .2s ease,transform .2s ease}
+#loginScreen{background:radial-gradient(circle at 50% 15%,rgba(129,79,202,.24),transparent 38%),transparent}
+/* Fine, restrained star specks without obstructing controls */
+body:before{content:"✦";position:fixed;pointer-events:none;z-index:0;top:12%;left:8%;font-size:14px;color:#d8c3ff;opacity:.28;animation:starTurn 18s linear infinite}
+body:after{content:"✧";position:fixed;pointer-events:none;z-index:0;bottom:15%;right:8%;font-size:24px;color:#b99aff;opacity:.18;animation:starTurn 24s linear infinite reverse}
+@keyframes starTurn{to{transform:rotate(360deg)}}
+#dashboard>*{position:relative;z-index:1}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
 </style>
 </head>
 <body>
