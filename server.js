@@ -251,6 +251,7 @@ function publicState(state) {
     matches: state.matches.filter(m => m.published !== false),
     challenges: state.challenges.filter(c => c.published),
     announcements: state.announcements.filter(a => a.published),
+    homeAnnouncements: state.announcements.filter(a => a.published && a.showOnHome === true),
     prizes: state.prizes.filter(p => p.public && p.delivered),
     settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt, displayDiscordNames: !!state.settings.displayDiscordNames, eventLaunch: state.settings.eventLaunch || DEFAULT_STATE.settings.eventLaunch },
     winner: state.winner?.published ? state.winner : null,
@@ -404,8 +405,8 @@ async function performAction(state, type, p) {
     case 'addChallenge': state.challenges.push({id:id(),title:text(p.title,100),description:text(p.description,1000),points:num(p.points),achievement:text(p.achievement,80),published:bool(p.published),completedBy:[],createdAt:now}); break;
     case 'completeChallenge': { const challenge=findById(state.challenges,p.challengeId,'Challenge'); const player=findById(state.players,p.playerId,'Participant'); challenge.completedBy ||= []; if(!challenge.completedBy.includes(player.id)){challenge.completedBy.push(player.id);player.points=num(player.points)+num(challenge.points);if(challenge.achievement){player.achievements ||= [];player.achievements.push({id:id(),name:challenge.achievement,createdAt:now});}} break; }
     case 'deleteChallenge': { const i=state.challenges.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Challenge not found.');pushRecycle(state,'challenge',state.challenges.splice(i,1)[0]);break; }
-    case 'addAnnouncement': state.announcements.push({id:id(),title:text(p.title,100),body:text(p.body,3000),published:bool(p.published),createdAt:now});break;
-    case 'updateAnnouncement': {const a=findById(state.announcements,p.id,'Announcement');['title','body','published'].forEach(k=>{if(p[k]!==undefined)a[k]=k==='published'?bool(p[k]):text(p[k],3000);});break;}
+    case 'addAnnouncement': state.announcements.push({id:id(),title:text(p.title,100),body:text(p.body,3000),published:bool(p.published),showOnHome:bool(p.showOnHome),createdAt:now});break;
+    case 'updateAnnouncement': {const a=findById(state.announcements,p.id,'Announcement');['title','body','published','showOnHome'].forEach(k=>{if(p[k]!==undefined)a[k]=(k==='published'||k==='showOnHome')?bool(p[k]):text(p[k],3000);});break;}
     case 'deleteAnnouncement': {const i=state.announcements.findIndex(x=>x.id===p.id);if(i<0)throw new Error('Announcement not found.');pushRecycle(state,'announcement',state.announcements.splice(i,1)[0]);break;}
     case 'bulkPublishAnnouncements': {const ids=new Set(p.ids||[]);state.announcements.forEach(a=>{if(ids.has(a.id))a.published=bool(p.published);});break;}
     case 'bulkDeleteAnnouncements': {const ids=new Set(p.ids||[]);state.announcements=state.announcements.filter(a=>{if(!ids.has(a.id))return true;pushRecycle(state,'announcement',a);return false;});break;}
@@ -636,6 +637,28 @@ async function importBackup(req, res, payload) {
     client.release();
   }
 }
+
+app.get('/api/staff/discord-role-check',requireStaff,async(req,res)=>{
+  try {
+    const guildId=String(process.env.DISCORD_GUILD_ID||'').trim();
+    const roleId=String(process.env.NEROLYMPICS_ROLE_ID||'').trim();
+    const token=String(process.env.DISCORD_BOT_TOKEN||'').trim().replace(/^Bot\s+/i,'');
+    if(!guildId||!roleId||!token) return res.status(400).json({error:'Set DISCORD_GUILD_ID, DISCORD_BOT_TOKEN and NEROLYMPICS_ROLE_ID in Render first.'});
+    const headers={Authorization:`Bot ${token}`};
+    const roles=await discordRequest(`${DISCORD_API}/guilds/${guildId}/roles`,{headers},'Read Discord roles');
+    if(!roles.some(r=>r.id===roleId))return res.status(400).json({error:'Configured Nerolympics role ID was not found in the server.'});
+    let members=[],after='0';
+    for(let page=0;page<100;page++){
+      const batch=await discordRequest(`${DISCORD_API}/guilds/${guildId}/members?limit=1000&after=${after}`,{headers},'Read Discord server members');
+      if(!Array.isArray(batch)||!batch.length)break;
+      members.push(...batch.filter(m=>(m.roles||[]).includes(roleId)));
+      after=batch[batch.length-1].user.id;
+      if(batch.length<1000)break;
+    }
+    res.json({members:members.map(m=>({id:m.user.id,username:m.user.username,globalName:m.user.global_name||'',nick:m.nick||'',display:m.nick||m.user.global_name||m.user.username}))});
+  } catch(e){res.status(502).json({error:e.message||'Discord role check failed.'});}
+});
+
 app.get('/api/staff/backup',requireStaff,requireAdmin,async(req,res)=>{try{const state=await getState();res.json({app:'nerolympics',schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:state});}catch(e){res.status(500).json({error:'Export failed.'});}});
 app.get('/api/staff/analytics',requireStaff,async(req,res)=>{try{const s=await getState();const total=s.players.length;const checkins=s.players.reduce((n,p)=>n+(p.checkIns||[]).filter(c=>c.status==='Present'||c.status==='Late').length,0);const possible=s.players.length*s.events.length;const teamStats=s.teams.map(t=>({id:t.id,name:t.name,players:(t.memberIds||[]).length,points:num(t.points),wins:num(t.wins)})).sort((a,b)=>b.points-a.points);res.json({participants:total,active:s.players.filter(p=>p.status!=='Disqualified').length,participationRate:possible?Math.round(checkins/possible*100):0,totalPoints:s.players.reduce((n,p)=>n+num(p.points),0),matches:s.matches.length,completedMatches:s.matches.filter(m=>m.status==='Completed').length,teamStats});}catch(e){res.status(500).json({error:'Analytics unavailable.'});}});
 app.get('/api/staff/search',requireStaff,async(req,res)=>{try{const q=text(req.query.q,100).toLowerCase();if(!q)return res.json([]);const s=await getState();const groups=[['Participant',s.players,x=>`${x.roblox} ${x.discord||''}`],['Team',s.teams,x=>x.name],['Event',s.events,x=>`${x.title} ${x.description||''}`],['Match',s.matches,x=>x.title],['Announcement',s.announcements,x=>`${x.title} ${x.body||''}`],['Prize',s.prizes,x=>`${x.playerName} ${x.reward}`],['Recycle Bin',s.recycleBin,x=>`${x.type} ${x.record?.roblox||x.record?.name||x.record?.title||''}`],['Version History',s.versions,x=>`${x.summary||''}`],['Activity Log',s.activityLog,x=>`${x.summary||''}`]];const out=[];for(const [type,items,field] of groups)for(const item of items){if(field(item).toLowerCase().includes(q))out.push({type,id:item.id,label:item.roblox||item.name||item.title||item.reward||item.type,detail:type==='Participant'?item.status:type==='Prize'?item.playerName:''});}res.json(out.slice(0,60));}catch(e){res.status(500).json({error:'Search failed.'});}});
