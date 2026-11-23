@@ -47,7 +47,10 @@ html{scroll-behavior:smooth}body{background-attachment:fixed;overflow-x:hidden}b
 <div class="date-note" id="status" style="margin-top:8px">Loading event information...</div>
 </section>
 
-
+<section class="section" id="homeUpdates" data-page>
+<div class="section-head"><div><p>OFFICIAL UPDATES</p><h2>Latest Announcements</h2></div></div>
+<div class="list" id="homeAnnouncementList"><div class="empty">No announcements featured yet.</div></div>
+</section>
 
 <section class="section" id="schedule" data-page>
 <div class="section-head">
@@ -116,7 +119,7 @@ html{scroll-behavior:smooth}body{background-attachment:fixed;overflow-x:hidden}b
 </section>
 </main>
 
-<footer class="footer">THE NEROLYMPICS · NEROTOPIA<br>All event times are displayed in your local timezone.</footer>
+
 </div>
 
 <div class="launch-overlay" id="eventLaunchOverlay" hidden><div class="launch-box"><div class="eyebrow">NEROTOPIA PRESENTS · EVENT LIVE</div><h2 id="launchTitle">THE NEROLYMPICS</h2><p id="launchSubtitle"></p><div class="launch-clock" id="launchClock"></div><button class="launch-continue" id="launchContinue">Enter competition</button></div></div>
@@ -257,6 +260,12 @@ function renderTeams(teams, players, settings) {
   `).join('');
 }
 
+function renderHomeAnnouncements(items) {
+  const host=$('homeAnnouncementList');
+  if(!items?.length){empty(host,'No announcements featured yet.');return;}
+  host.innerHTML=items.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(item=>`<article class="listitem"><h3>${esc(item.title)}</h3><p>${esc(item.body)}</p><div class="meta">${date(item.createdAt)}</div></article>`).join('');
+}
+
 function renderAnnouncements(items) {
   if (!items.length) {
     return empty(
@@ -380,6 +389,7 @@ async function loadSite() {
     renderLeaderboard(data.players || [], data.teams || [], data.settings || {});
     renderTeams(data.teams || [], data.players || [], data.settings || {});
     renderAnnouncements(data.announcements || []);
+    renderHomeAnnouncements(data.homeAnnouncements || []);
     renderWinner(data.winner);
     renderEventLaunch(data.settings);
     renderMvp(data.mvp);
