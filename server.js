@@ -142,7 +142,7 @@ const DEFAULT_PERMISSIONS = {
   bulkAssignTeam: true, bulkDeleteTeams: false,
   restoreRecycleItem: true,
   bulkRestoreRecycleItems: true,
-  setMaintenance: true
+  setMaintenance: true, launchEvent: true
 };
 const ADMIN_ONLY_ACTIONS = new Set([
   'clearWinner',
@@ -156,6 +156,7 @@ const DEFAULT_STATE = {
     teamsPublished: false,
     maintenanceMode: false,
     maintenanceMessage: 'The Nerolympics website is temporarily under maintenance. Please check back soon.',
+    eventLaunch: { enabled: false, title: 'The Nerolympics', subtitle: 'The next event is about to begin.', startAt: null },
     eventStartAt: '2026-11-14T23:00:00.000Z',
     displayDiscordNames: false,
     staffPermissions: { ...DEFAULT_PERMISSIONS },
@@ -251,7 +252,7 @@ function publicState(state) {
     challenges: state.challenges.filter(c => c.published),
     announcements: state.announcements.filter(a => a.published),
     prizes: state.prizes.filter(p => p.public && p.delivered),
-    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt, displayDiscordNames: !!state.settings.displayDiscordNames },
+    settings: { teamsPublished: !!state.settings.teamsPublished, maintenanceMode: !!state.settings.maintenanceMode, eventStartAt: state.settings.eventStartAt || DEFAULT_STATE.settings.eventStartAt, displayDiscordNames: !!state.settings.displayDiscordNames, eventLaunch: state.settings.eventLaunch || DEFAULT_STATE.settings.eventLaunch },
     winner: state.winner?.published ? state.winner : null,
     history: state.history,
     hallOfFame: state.hallOfFame,
@@ -270,7 +271,7 @@ function summaryFor(type, p) {
     addAchievement: 'Added achievement', addChallenge: `Created challenge ${p.title || ''}`, completeChallenge: 'Completed challenge', deleteChallenge: 'Moved challenge to Recycle Bin',
     addAnnouncement: `Created announcement ${p.title || ''}`, updateAnnouncement: 'Updated announcement', deleteAnnouncement: 'Moved announcement to Recycle Bin',
     publishWinner: 'Published event winner', clearWinner: 'Cleared event winner',
-    setCountdown: 'Updated event countdown date and time',
+    setCountdown: 'Updated event countdown date and time', launchEvent: 'Updated event launch screen',
     addHallOfFame: 'Added Hall of Fame entry', updateHallOfFame: 'Updated Hall of Fame entry', deleteHallOfFame: 'Moved Hall of Fame entry to Recycle Bin', selectMvp: 'Selected MVP', publishMvp: 'Published MVP',
     addPrize: 'Added prize record', updatePrize: 'Updated prize record', deletePrize: 'Moved prize to Recycle Bin',
     bulkPlayerStatus: 'Changed participant statuses', bulkDeletePlayers: 'Moved participants to Recycle Bin',
@@ -442,6 +443,7 @@ async function performAction(state, type, p) {
     case 'clearActivityLog': { state.activityLog=[]; state.versions.forEach(v=>{ if(v.snapshot) v.snapshot.activityLog=[]; }); break; }
     case 'updatePermissions': {const next=p.permissions||{};Object.keys(DEFAULT_PERMISSIONS).forEach(k=>{if(typeof next[k]==='boolean')state.settings.staffPermissions[k]=next[k];});break;}
     case 'setMaintenance': state.settings.maintenanceMode=bool(p.enabled);state.settings.maintenanceMessage=text(p.message||state.settings.maintenanceMessage,1000);break;
+    case 'launchEvent': { state.settings.eventLaunch={enabled:bool(p.enabled),title:text(p.title||'The Nerolympics',100),subtitle:text(p.subtitle||'',500),startAt:p.startAt||null}; break; }
     case 'setCountdown': { if (!p.eventStartAt || Number.isNaN(new Date(p.eventStartAt).getTime())) throw new Error('Enter a valid event date and time.'); state.settings.eventStartAt = new Date(p.eventStartAt).toISOString(); break; }
     case 'setPublicNameMode': { state.settings.displayDiscordNames = bool(p.enabled); break; }
     default: throw new Error(`Unknown action: ${type}`);
