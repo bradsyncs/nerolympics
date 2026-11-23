@@ -613,56 +613,68 @@ async function sendWithdrawalDM(userId) {
     method: 'POST', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: message })
   }, 'Send withdrawal DM');
 }
+async function processWithdrawal(interaction, user) {
+  const guildId = String(process.env.DISCORD_GUILD_ID).trim();
+  const attendeeRoleId = String(process.env.NEROLYMPICS_ATTENDEE_ROLE_ID || '').trim();
+  const token = String(process.env.DISCORD_BOT_TOKEN).trim().replace(/^Bot\s+/i, '');
+  const headers = { Authorization: `Bot ${token}` };
+  let roleRemoved = false;
+  let websiteRemoved = false;
+
+  // Verify the role again through the API before changing anything.
+  const member = await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, { headers }, 'Verify attendee member');
+  if (!(member.roles || []).includes(attendeeRoleId)) {
+    return 'You no longer have the Nerolympics Attendee role.';
+  }
+  await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, {
+    method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roles: member.roles.filter(roleId => roleId !== attendeeRoleId) })
+  }, 'Remove attendee role');
+  roleRemoved = true;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const state = await getState(client);
+    const player = state.players.find(p => String(p.discordId || '') === String(user.id));
+    if (player) {
+      takeSnapshot(state, `Before ${player.roblox} withdrew via Discord command`);
+      const playerIndex = state.players.findIndex(p => p.id === player.id);
+      const [removedPlayer] = state.players.splice(playerIndex, 1);
+      pushRecycle(state, 'player', removedPlayer);
+      state.teams.forEach(team => team.memberIds = (team.memberIds || []).filter(pid => pid !== player.id));
+      logActivity(state, `${player.roblox} withdrew using the Discord /nerolympics command`, 'deletePlayer', { displayName: user.global_name || user.username, roleName: 'Discord participant' });
+      await saveState(state, client);
+      websiteRemoved = true;
+    }
+    await client.query('COMMIT');
+  } catch (err) { await client.query('ROLLBACK').catch(()=>{}); throw err; }
+  finally { client.release(); }
+
+  let dmSent = true;
+  try { await sendWithdrawalDM(user.id); } catch (e) { dmSent = false; console.warn('Withdrawal DM could not be delivered:', e.message); }
+  if (websiteRemoved) return `Your withdrawal is complete: your role was removed, and you were removed from the active participant list.${dmSent ? ' A private message has also been sent.' : ' I could not send you a DM.'}`;
+  return `Your attendee role has been removed. We could not find a participant record linked to your Discord ID, so no website record was changed.${dmSent ? ' A private message has also been sent.' : ' I could not send you a DM.'}`;
+}
+
 app.post('/discord/interactions', async (req, res) => {
   if (!verifyDiscordSignature(req)) return res.status(401).send('Invalid Discord signature.');
   const interaction = req.body;
-  if (interaction.type === 1) return res.json({ type: 1 }); // PING
+  if (interaction.type === 1) return res.json({ type: 1 }); // Discord endpoint verification ping
   if (interaction.type !== 2 || interaction.data?.name !== WITHDRAW_COMMAND) return res.status(404).send('Unknown interaction.');
   const user = interaction.member?.user || interaction.user;
   const memberRoles = interaction.member?.roles || [];
   const attendeeRoleId = String(process.env.NEROLYMPICS_ATTENDEE_ROLE_ID || '').trim();
-  if (!attendeeRoleId || !user?.id) return discordInteractionReply(interaction, 'This command is not configured yet.');
-  if (!memberRoles.includes(attendeeRoleId)) return discordInteractionReply(interaction, 'This command is only available to Nerolympics Attendees.');
-  try {
-    await discordInteractionDefer(interaction);
-    const guildId = String(process.env.DISCORD_GUILD_ID).trim();
-    const token = String(process.env.DISCORD_BOT_TOKEN).trim().replace(/^Bot\s+/i, '');
-    const headers = { Authorization: `Bot ${token}` };
-    // Confirm the attendee role is still present and remove it.
-    const member = await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, { headers }, 'Verify attendee member');
-    if (!(member.roles || []).includes(attendeeRoleId)) return editDiscordInteraction(interaction, 'You no longer have the Nerolympics Attendee role.');
-    await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, {
-      method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ roles: member.roles.filter(roleId => roleId !== attendeeRoleId) })
-    }, 'Remove attendee role');
+  if (!attendeeRoleId || !user?.id) return res.json({ type: 4, data: { content: 'This command is not configured yet.', flags: 64 } });
+  if (!memberRoles.includes(attendeeRoleId)) return res.json({ type: 4, data: { content: 'This command is only available to Nerolympics Attendees.', flags: 64 } });
 
-    // Remove the participant from active records and place the full record in the Recycle Bin.
-    const client = await pool.connect();
-    let removed = false;
-    try {
-      await client.query('BEGIN');
-      const state = await getState(client);
-      const player = state.players.find(p => String(p.discordId || '') === String(user.id));
-      if (player) {
-        takeSnapshot(state, `Before ${player.roblox} withdrew via Discord command`);
-        const playerIndex = state.players.findIndex(p => p.id === player.id);
-        const [removedPlayer] = state.players.splice(playerIndex, 1);
-        pushRecycle(state, 'player', removedPlayer);
-        state.teams.forEach(team => team.memberIds = (team.memberIds || []).filter(pid => pid !== player.id));
-        logActivity(state, `${player.roblox} withdrew using the Discord /nerolympics command`, 'deletePlayer', { displayName: user.global_name || user.username, roleName: 'Discord participant' });
-        await saveState(state, client); removed = true;
-      }
-      await client.query('COMMIT');
-    } catch (err) { await client.query('ROLLBACK').catch(()=>{}); throw err; }
-    finally { client.release(); }
-
-    let dmSent = true;
-    try { await sendWithdrawalDM(user.id); } catch (e) { dmSent = false; console.warn('Withdrawal DM could not be delivered:', e.message); }
-    const base = removed ? 'You have withdrawn and been removed from the active Nerolympics participant list.' : 'Your attendee role has been removed. We could not find a participant record linked to your Discord ID, so no website record was changed.';
-    await editDiscordInteraction(interaction, `${base}${dmSent ? ' A private message has also been sent.' : ' I could not send you a DM; your withdrawal was processed.'}`);
-  } catch (err) {
-    console.error('Withdrawal command failed:', err.message);
-    try { await editDiscordInteraction(interaction, 'Something went wrong processing your withdrawal. Please contact Nerolympics staff.'); } catch (_) {}
-  }
+  // Acknowledge the interaction directly in the HTTP response within Discord's deadline.
+  res.status(200).json({ type: 5, data: { flags: 64 } });
+  processWithdrawal(interaction, user).then(content => editDiscordInteraction(interaction, content))
+    .catch(err => {
+      console.error('Withdrawal command failed:', err.stack || err.message);
+      editDiscordInteraction(interaction, 'Something went wrong processing your withdrawal. Please contact Nerolympics staff.').catch(() => {});
+    });
 });
 
 app.get('/health', (req,res)=>res.json({ok:true,service:'nerolympics'}));
@@ -795,9 +807,28 @@ app.use('/api',(req,res)=>res.status(404).json({error:'API route not found.'}));
 app.use((req,res)=>res.status(404).send('Page not found.'));
 app.use((err,req,res,next)=>{console.error(err);if(res.headersSent)return next(err);res.status(500).json({error:'Unexpected server error.'});});
 
+let discordGatewayClient = null;
+function startDiscordGatewayPresence() {
+  const token = String(process.env.DISCORD_BOT_TOKEN || '').trim().replace(/^Bot\s+/i, '');
+  if (!token) { console.warn('Discord Gateway presence skipped: DISCORD_BOT_TOKEN is missing.'); return; }
+  try {
+    const { Client, GatewayIntentBits } = require('discord.js');
+    discordGatewayClient = new Client({ intents: [GatewayIntentBits.Guilds] });
+    discordGatewayClient.once('ready', () => {
+      console.log(`Discord Gateway connected as ${discordGatewayClient.user.tag}.`);
+      discordGatewayClient.user.setPresence({ status: 'online', activities: [{ name: 'The Nerolympics', type: 3 }] });
+    });
+    discordGatewayClient.on('error', error => console.error('Discord Gateway error:', error.message));
+    discordGatewayClient.login(token).catch(error => console.error('Discord Gateway login failed:', error.message));
+  } catch (error) {
+    console.error('Discord Gateway could not start. Check that discord.js is installed:', error.message);
+  }
+}
+
 initDb().then(()=>{
   app.listen(PORT,()=>console.log(`Nerolympics server listening on ${PORT}`));
   registerWithdrawalCommand().catch(error=>console.error('Slash command registration failed:',error.message));
+  startDiscordGatewayPresence();
   // Backups run while the service is awake; a persistent database remains the source of truth.
   setInterval(async()=>{try{const state=await getState();await pool.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)',[JSON.stringify({app:'nerolympics',schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:state})]);await pool.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)',[BACKUP_LIMIT]);}catch(e){console.error('Scheduled backup failed:',e.message);}},6*60*60*1000).unref();
 }).catch(error=>{console.error('Database initialization failed:',error);process.exit(1);});
