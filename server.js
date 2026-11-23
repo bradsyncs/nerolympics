@@ -327,13 +327,14 @@ async function performAction(state, type, p) {
       const roblox = text(p.roblox, 40);
       if (!roblox) throw new Error('Roblox username is required.');
       if (state.players.some(x => x.roblox.toLowerCase() === roblox.toLowerCase())) throw new Error('That Roblox username is already registered.');
-      state.players.push({ id: id(), roblox, discord: text(p.discord, 80), status: text(p.status || 'Registered', 40), points: 0, teamId: null, registeredAt: now, checkIns: [], achievements: [] });
+      state.players.push({ id: id(), roblox, discord: text(p.discord, 80), discordId: text(p.discordId, 40), status: text(p.status || 'Registered', 40), points: 0, teamId: null, registeredAt: now, checkIns: [], achievements: [] });
       break;
     }
     case 'updatePlayer': {
       const player = findById(state.players, p.id, 'Participant');
       if (p.roblox !== undefined) player.roblox = text(p.roblox, 40);
       if (p.discord !== undefined) player.discord = text(p.discord, 80);
+      if (p.discordId !== undefined) player.discordId = text(p.discordId, 40);
       if (p.status !== undefined) player.status = text(p.status, 40);
       if (p.points !== undefined) player.points = num(p.points);
       if (p.teamId !== undefined) player.teamId = p.teamId || null;
@@ -637,6 +638,26 @@ async function importBackup(req, res, payload) {
     client.release();
   }
 }
+
+
+app.post('/api/staff/discord-identity-scan',requireStaff,async(req,res)=>{
+  try{
+    const guildId=String(process.env.DISCORD_GUILD_ID||'').trim(),token=String(process.env.DISCORD_BOT_TOKEN||'').trim().replace(/^Bot\s+/i,'');
+    if(!guildId||!token)return res.status(400).json({error:'Set DISCORD_GUILD_ID and DISCORD_BOT_TOKEN in Render first.'});
+    const headers={Authorization:`Bot ${token}`};let members=[],after='0';
+    for(let page=0;page<1000;page++){const batch=await discordRequest(`${DISCORD_API}/guilds/${guildId}/members?limit=1000&after=${after}`,{headers},'Read Discord server members');if(!Array.isArray(batch)||!batch.length)break;members.push(...batch);after=batch[batch.length-1].user.id;if(batch.length<1000)break;}
+    const norm=x=>String(x||'').replace(/^@/,'').trim().toLowerCase();
+    const state=await getState();let updated=0,unchanged=0,notFound=0,ambiguous=0;const results=[];
+    for(const p of state.players){if(p.discordId){unchanged++;results.push({roblox:p.roblox,discord:p.discord,status:'matched',discordId:p.discordId});continue;}const key=norm(p.discord);if(!key){notFound++;results.push({roblox:p.roblox,discord:p.discord,status:'not-found'});continue;}
+      const candidates=members.filter(m=>[m.user.username,m.user.global_name,m.nick].filter(Boolean).some(n=>norm(n)===key));const unique=[...new Map(candidates.map(m=>[m.user.id,m])).values()];
+      if(unique.length===1){const m=unique[0];p.discordId=m.user.id;if(!p.discord)p.discord=m.user.username;updated++;results.push({roblox:p.roblox,discord:p.discord,status:'matched',discordId:m.user.id});}
+      else if(unique.length>1){ambiguous++;results.push({roblox:p.roblox,discord:p.discord,status:'ambiguous',candidates:unique.slice(0,5).map(m=>({id:m.user.id,username:m.user.username,display:m.nick||m.user.global_name||m.user.username}))});}
+      else{notFound++;results.push({roblox:p.roblox,discord:p.discord,status:'not-found'});}
+    }
+    if(updated){await saveState(state);}
+    res.json({scanned:state.players.length,updated,unchanged,notFound,ambiguous,results});
+  }catch(e){res.status(502).json({error:e.message||'Discord identity scan failed.'});}
+});
 
 app.get('/api/staff/discord-role-check',requireStaff,async(req,res)=>{
   try {
