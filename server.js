@@ -171,7 +171,7 @@ const DEFAULT_STATE = {
   backups: []
 };
 
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '20mb', verify: (req, res, buf) => { req.rawBody = Buffer.from(buf); } }));
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
   store: new PgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
@@ -558,6 +558,113 @@ app.get('/auth/discord/callback', async (req, res) => {
   }
 });
 
+// Discord /nerolympics withdrawal command (configured with Render environment variables).
+const WITHDRAW_COMMAND = 'nerolympics';
+function discordInteractionConfigReady() {
+  return Boolean(process.env.DISCORD_APPLICATION_ID && process.env.DISCORD_PUBLIC_KEY && process.env.DISCORD_GUILD_ID && process.env.DISCORD_BOT_TOKEN && process.env.NEROLYMPICS_ATTENDEE_ROLE_ID);
+}
+function verifyDiscordSignature(req) {
+  try {
+    const signature = req.get('X-Signature-Ed25519');
+    const timestamp = req.get('X-Signature-Timestamp');
+    if (!signature || !timestamp || !req.rawBody || !process.env.DISCORD_PUBLIC_KEY) return false;
+    const key = Buffer.from(process.env.DISCORD_PUBLIC_KEY.trim(), 'hex');
+    if (key.length !== 32) return false;
+    const keyDer = Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), key]);
+    const publicKey = crypto.createPublicKey({ key: keyDer, format: 'der', type: 'spki' });
+    return crypto.verify(null, Buffer.concat([Buffer.from(timestamp), req.rawBody]), publicKey, Buffer.from(signature, 'hex'));
+  } catch (_) { return false; }
+}
+async function registerWithdrawalCommand() {
+  if (!discordInteractionConfigReady()) {
+    console.log('Withdrawal slash command registration skipped: configure DISCORD_APPLICATION_ID, DISCORD_PUBLIC_KEY, DISCORD_GUILD_ID, DISCORD_BOT_TOKEN and NEROLYMPICS_ATTENDEE_ROLE_ID.');
+    return;
+  }
+  const token = String(process.env.DISCORD_BOT_TOKEN).trim().replace(/^Bot\s+/i, '');
+  await discordRequest(`${DISCORD_API}/applications/${process.env.DISCORD_APPLICATION_ID}/guilds/${process.env.DISCORD_GUILD_ID}/commands`, {
+    method: 'PUT', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([{ name: WITHDRAW_COMMAND, description: 'Withdraw from the Nerolympics and leave the attendee list.' }])
+  }, 'Register /nerolympics command');
+  console.log('Registered /nerolympics withdrawal command.');
+}
+async function discordInteractionReply(interaction, content, ephemeral = true) {
+  return discordRequest(`${DISCORD_API}/interactions/${interaction.id}/${interaction.token}/callback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 4, data: { content, flags: ephemeral ? 64 : 0 } })
+  }, 'Respond to Discord interaction');
+}
+async function discordInteractionDefer(interaction) {
+  return discordRequest(`${DISCORD_API}/interactions/${interaction.id}/${interaction.token}/callback`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 5, data: { flags: 64 } })
+  }, 'Defer Discord interaction');
+}
+async function editDiscordInteraction(interaction, content) {
+  return discordRequest(`${DISCORD_API}/webhooks/${process.env.DISCORD_APPLICATION_ID}/${interaction.token}/messages/@original`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content })
+  }, 'Update Discord interaction response');
+}
+async function sendWithdrawalDM(userId) {
+  const token = String(process.env.DISCORD_BOT_TOKEN).trim().replace(/^Bot\s+/i, '');
+  const dm = await discordRequest(`${DISCORD_API}/users/${userId}/channels`, {
+    method: 'POST', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ recipient_id: userId })
+  }, 'Open withdrawal DM');
+  const message = 'You have withdrawn from the Nerolympics.\n\nWe appreciate you being here with us through the struggles and the good times. We hope you were able to find moments that were fun and enjoyable throughout the event.\n\nIf you\'d like to share any feedback about your experience, we\'d love to hear it. Thank you for being part of the Nerolympics. ❤️';
+  await discordRequest(`${DISCORD_API}/channels/${dm.id}/messages`, {
+    method: 'POST', headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: message })
+  }, 'Send withdrawal DM');
+}
+app.post('/discord/interactions', async (req, res) => {
+  if (!verifyDiscordSignature(req)) return res.status(401).send('Invalid Discord signature.');
+  const interaction = req.body;
+  if (interaction.type === 1) return res.json({ type: 1 }); // PING
+  if (interaction.type !== 2 || interaction.data?.name !== WITHDRAW_COMMAND) return res.status(404).send('Unknown interaction.');
+  const user = interaction.member?.user || interaction.user;
+  const memberRoles = interaction.member?.roles || [];
+  const attendeeRoleId = String(process.env.NEROLYMPICS_ATTENDEE_ROLE_ID || '').trim();
+  if (!attendeeRoleId || !user?.id) return discordInteractionReply(interaction, 'This command is not configured yet.');
+  if (!memberRoles.includes(attendeeRoleId)) return discordInteractionReply(interaction, 'This command is only available to Nerolympics Attendees.');
+  try {
+    await discordInteractionDefer(interaction);
+    const guildId = String(process.env.DISCORD_GUILD_ID).trim();
+    const token = String(process.env.DISCORD_BOT_TOKEN).trim().replace(/^Bot\s+/i, '');
+    const headers = { Authorization: `Bot ${token}` };
+    // Confirm the attendee role is still present and remove it.
+    const member = await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, { headers }, 'Verify attendee member');
+    if (!(member.roles || []).includes(attendeeRoleId)) return editDiscordInteraction(interaction, 'You no longer have the Nerolympics Attendee role.');
+    await discordRequest(`${DISCORD_API}/guilds/${guildId}/members/${user.id}`, {
+      method: 'PATCH', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ roles: member.roles.filter(roleId => roleId !== attendeeRoleId) })
+    }, 'Remove attendee role');
+
+    // Remove the participant from active records and place the full record in the Recycle Bin.
+    const client = await pool.connect();
+    let removed = false;
+    try {
+      await client.query('BEGIN');
+      const state = await getState(client);
+      const player = state.players.find(p => String(p.discordId || '') === String(user.id));
+      if (player) {
+        takeSnapshot(state, `Before ${player.roblox} withdrew via Discord command`);
+        const playerIndex = state.players.findIndex(p => p.id === player.id);
+        const [removedPlayer] = state.players.splice(playerIndex, 1);
+        pushRecycle(state, 'player', removedPlayer);
+        state.teams.forEach(team => team.memberIds = (team.memberIds || []).filter(pid => pid !== player.id));
+        logActivity(state, `${player.roblox} withdrew using the Discord /nerolympics command`, 'deletePlayer', { displayName: user.global_name || user.username, roleName: 'Discord participant' });
+        await saveState(state, client); removed = true;
+      }
+      await client.query('COMMIT');
+    } catch (err) { await client.query('ROLLBACK').catch(()=>{}); throw err; }
+    finally { client.release(); }
+
+    let dmSent = true;
+    try { await sendWithdrawalDM(user.id); } catch (e) { dmSent = false; console.warn('Withdrawal DM could not be delivered:', e.message); }
+    const base = removed ? 'You have withdrawn and been removed from the active Nerolympics participant list.' : 'Your attendee role has been removed. We could not find a participant record linked to your Discord ID, so no website record was changed.';
+    await editDiscordInteraction(interaction, `${base}${dmSent ? ' A private message has also been sent.' : ' I could not send you a DM; your withdrawal was processed.'}`);
+  } catch (err) {
+    console.error('Withdrawal command failed:', err.message);
+    try { await editDiscordInteraction(interaction, 'Something went wrong processing your withdrawal. Please contact Nerolympics staff.'); } catch (_) {}
+  }
+});
+
 app.get('/health', (req,res)=>res.json({ok:true,service:'nerolympics'}));
 app.get('/staff', (req,res)=>res.sendFile(path.join(publicDir,'staff.html')));
 app.get('/', async (req,res)=>{
@@ -690,6 +797,7 @@ app.use((err,req,res,next)=>{console.error(err);if(res.headersSent)return next(e
 
 initDb().then(()=>{
   app.listen(PORT,()=>console.log(`Nerolympics server listening on ${PORT}`));
+  registerWithdrawalCommand().catch(error=>console.error('Slash command registration failed:',error.message));
   // Backups run while the service is awake; a persistent database remains the source of truth.
   setInterval(async()=>{try{const state=await getState();await pool.query('INSERT INTO automatic_backups(data) VALUES($1::jsonb)',[JSON.stringify({app:'nerolympics',schemaVersion:SCHEMA_VERSION,exportedAt:new Date().toISOString(),data:state})]);await pool.query('DELETE FROM automatic_backups WHERE id NOT IN (SELECT id FROM automatic_backups ORDER BY created_at DESC LIMIT $1)',[BACKUP_LIMIT]);}catch(e){console.error('Scheduled backup failed:',e.message);}},6*60*60*1000).unref();
 }).catch(error=>{console.error('Database initialization failed:',error);process.exit(1);});
